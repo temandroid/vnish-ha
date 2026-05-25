@@ -5,16 +5,19 @@
         "title": "Add Vnish Miner",
         "data": {
           "host": "IP address or hostname",
-          "api_key": "API key (optional)"
+          "api_key": "API key (optional)",
+          "password": "Password (optional)"
         },
         "data_description": {
           "host": "Local IP address of the miner (e.g. 192.168.1.100)",
-          "api_key": "Leave empty if the miner does not require authentication"
+          "api_key": "Leave empty if the miner does not require authentication",
+          "password": "Miner web interface password (takes priority over API key)"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect. Check the IP address and make sure the miner is reachable.",
+      "invalid_auth": "Invalid credentials. Check the API key or password.",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
@@ -26,7 +29,13 @@
       "init": {
         "title": "Vnish Miner options",
         "data": {
+          "api_key": "API key",
+          "password": "Password",
           "scan_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "api_key": "Leave empty to remove API key authentication",
+          "password": "Leave empty to keep the existing password"
         }
       }
     }

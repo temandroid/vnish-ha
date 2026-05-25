@@ -6,8 +6,8 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.vnish.api import VnishApiError
-from custom_components.vnish.const import CONF_API_KEY, DOMAIN
+from custom_components.vnish.api import VnishApiError, VnishAuthError
+from custom_components.vnish.const import CONF_API_KEY, CONF_PASSWORD, DOMAIN
 
 from .conftest import MOCK_HOST, MOCK_INFO
 
@@ -34,9 +34,30 @@ async def test_form_success(hass):
     assert result2["data"][CONF_HOST] == MOCK_HOST
 
 
+async def test_form_success_with_password(hass):
+    """Config flow creates entry when valid password is provided."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.login",
+        new_callable=AsyncMock,
+    ), patch(
+        "custom_components.vnish.config_flow.VnishApiClient.get_info",
+        new_callable=AsyncMock,
+        return_value=MOCK_INFO,
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: MOCK_HOST, CONF_PASSWORD: "secret"}
+        )
+
+    assert result2["type"] == FlowResultType.CREATE_ENTRY
+    assert result2["data"][CONF_PASSWORD] == "secret"
+
+
 def test_host_is_normalized(hass):
     """Host strips http:// prefix and trailing slash."""
-    # Directly test the normalization logic
     raw = "  http://192.168.1.100/  "
     normalized = raw.strip().removeprefix("http://").removeprefix("https://").rstrip("/")
     assert normalized == "192.168.1.100"
@@ -61,8 +82,27 @@ async def test_form_cannot_connect(hass):
     assert result2["errors"]["base"] == "cannot_connect"
 
 
+async def test_form_invalid_auth(hass):
+    """Config flow shows invalid_auth error when password is wrong."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.login",
+        new_callable=AsyncMock,
+        side_effect=VnishAuthError("Authentication failed (HTTP 401)"),
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: MOCK_HOST, CONF_PASSWORD: "wrongpass"}
+        )
+
+    assert result2["type"] == FlowResultType.FORM
+    assert result2["errors"]["base"] == "invalid_auth"
+
+
 async def test_form_duplicate(hass):
-    """Config flow aborts when same serial is already configured."""
+    """Config flow aborts when same host is already configured."""
     with patch(
         "custom_components.vnish.config_flow.VnishApiClient.get_info",
         new_callable=AsyncMock,
@@ -75,7 +115,6 @@ async def test_form_duplicate(hass):
             result["flow_id"], {CONF_HOST: MOCK_HOST}
         )
 
-        # Second attempt with same serial
         result2 = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -87,7 +126,7 @@ async def test_form_duplicate(hass):
     assert result3["reason"] == "already_configured"
 
 
-async def test_options_flow(hass, mock_api):
+async def test_options_flow_scan_interval(hass, mock_api):
     """Options flow saves scan_interval."""
     entry = await _setup_entry(hass)
 
@@ -101,6 +140,49 @@ async def test_options_flow(hass, mock_api):
     assert entry.options[CONF_SCAN_INTERVAL] == 60
 
 
+async def test_options_flow_api_key_update(hass, mock_api):
+    """Options flow validates and saves updated API key."""
+    entry = await _setup_entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.get_info",
+        new_callable=AsyncMock,
+        return_value=MOCK_INFO,
+    ):
+        result2 = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "new-api-key", CONF_SCAN_INTERVAL: 30},
+        )
+
+    assert result2["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_API_KEY] == "new-api-key"
+
+
+async def test_options_flow_password_update(hass, mock_api):
+    """Options flow validates password via login() and saves it."""
+    entry = await _setup_entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.login",
+        new_callable=AsyncMock,
+    ), patch(
+        "custom_components.vnish.config_flow.VnishApiClient.get_info",
+        new_callable=AsyncMock,
+        return_value=MOCK_INFO,
+    ):
+        result2 = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "newpassword", CONF_SCAN_INTERVAL: 30},
+        )
+
+    assert result2["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_PASSWORD] == "newpassword"
+
+
 async def _setup_entry(hass):
     """Helper: create and set up a config entry."""
     entry = config_entries.ConfigEntry(
@@ -111,7 +193,7 @@ async def _setup_entry(hass):
         data={CONF_HOST: MOCK_HOST},
         source=config_entries.SOURCE_USER,
         options={},
-        unique_id=MOCK_INFO["serial"],
+        unique_id=MOCK_HOST,
         discovery_keys={},
     )
     with patch(

@@ -5,10 +5,11 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import VnishApiClient, VnishApiError
-from .const import CONF_API_KEY, DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
+from .api import VnishApiClient, VnishApiError, VnishAuthError
+from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
 from .coordinator import VnishCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,11 +17,23 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_get_clientsession(hass)
+    api_key = entry.options.get(CONF_API_KEY) or entry.data.get(CONF_API_KEY) or None
+    password = entry.options.get(CONF_PASSWORD) or entry.data.get(CONF_PASSWORD) or None
     client = VnishApiClient(
         host=entry.data[CONF_HOST],
-        api_key=entry.data.get(CONF_API_KEY) or None,
+        api_key=api_key,
+        password=password,
         session=session,
     )
+
+    if password:
+        try:
+            await client.login()
+        except VnishAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except VnishApiError as err:
+            raise ConfigEntryNotReady(str(err)) from err
+
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = VnishCoordinator(hass, client, scan_interval)
 

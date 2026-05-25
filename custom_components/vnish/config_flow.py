@@ -6,8 +6,8 @@ from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import VnishApiClient, VnishApiError
-from .const import CONF_API_KEY, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .api import VnishApiClient, VnishApiError, VnishAuthError
+from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 
 class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -19,15 +19,22 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             host = user_input[CONF_HOST].strip().removeprefix("http://").removeprefix("https://").rstrip("/")
-            user_input = {**user_input, CONF_HOST: host}
+            api_key = user_input.get(CONF_API_KEY) or None
+            password = user_input.get(CONF_PASSWORD) or None
+            data = {**user_input, CONF_HOST: host}
             try:
                 session = async_get_clientsession(self.hass)
                 client = VnishApiClient(
                     host=host,
-                    api_key=user_input.get(CONF_API_KEY) or None,
+                    api_key=api_key,
+                    password=password,
                     session=session,
                 )
+                if password:
+                    await client.login()
                 info = await client.get_info()
+            except VnishAuthError:
+                errors["base"] = "invalid_auth"
             except VnishApiError:
                 errors["base"] = "cannot_connect"
             except Exception:  # noqa: BLE001
@@ -35,8 +42,8 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 await self.async_set_unique_id(host)
                 self._abort_if_unique_id_configured()
-                title = info.get("miner") or info.get("model") or user_input[CONF_HOST]
-                return self.async_create_entry(title=title, data=user_input)
+                title = info.get("miner") or info.get("model") or host
+                return self.async_create_entry(title=title, data=data)
 
         return self.async_show_form(
             step_id="user",
@@ -44,6 +51,7 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_HOST): str,
                     vol.Optional(CONF_API_KEY, default=""): str,
+                    vol.Optional(CONF_PASSWORD, default=""): str,
                 }
             ),
             errors=errors,
@@ -64,13 +72,63 @@ class VnishOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict | None = None
     ) -> config_entries.ConfigFlowResult:
+        errors: dict[str, str] = {}
+
+        current_api_key = (
+            self._config_entry.options.get(CONF_API_KEY)
+            or self._config_entry.data.get(CONF_API_KEY)
+            or ""
+        )
+        current_password = (
+            self._config_entry.options.get(CONF_PASSWORD)
+            or self._config_entry.data.get(CONF_PASSWORD)
+            or ""
+        )
+
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            new_api_key = user_input.get(CONF_API_KEY) or None
+            new_password_input = user_input.get(CONF_PASSWORD, "")
+            # empty password field = keep existing
+            password = new_password_input or current_password or None
+
+            credentials_changed = bool(new_password_input) or (
+                (user_input.get(CONF_API_KEY) or "") != current_api_key
+            )
+            if credentials_changed:
+                try:
+                    session = async_get_clientsession(self.hass)
+                    client = VnishApiClient(
+                        host=self._config_entry.data[CONF_HOST],
+                        api_key=new_api_key,
+                        password=password,
+                        session=session,
+                    )
+                    if password:
+                        await client.login()
+                    await client.get_info()
+                except VnishAuthError:
+                    errors["base"] = "invalid_auth"
+                except VnishApiError:
+                    errors["base"] = "cannot_connect"
+                except Exception:  # noqa: BLE001
+                    errors["base"] = "unknown"
+
+            if not errors:
+                return self.async_create_entry(
+                    title="",
+                    data={
+                        CONF_API_KEY: user_input.get(CONF_API_KEY, ""),
+                        CONF_PASSWORD: password or "",
+                        CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                    },
+                )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_API_KEY, default=current_api_key): str,
+                    vol.Optional(CONF_PASSWORD, default=""): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
                         default=self._config_entry.options.get(
@@ -79,4 +137,5 @@ class VnishOptionsFlow(config_entries.OptionsFlow):
                     ): vol.All(int, vol.Range(min=10, max=3600)),
                 }
             ),
+            errors=errors,
         )
