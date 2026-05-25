@@ -33,8 +33,7 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception:  # noqa: BLE001
                 errors["base"] = "unknown"
             else:
-                serial = info.get("serial") or user_input[CONF_HOST]
-                await self.async_set_unique_id(serial)
+                await self.async_set_unique_id(host)
                 self._abort_if_unique_id_configured()
                 title = info.get("miner") or info.get("model") or user_input[CONF_HOST]
                 return self.async_create_entry(title=title, data=user_input)

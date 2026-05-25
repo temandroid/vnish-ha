@@ -188,8 +188,8 @@ class VnishSensor(VnishEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        serial = coordinator.info.get("serial", coordinator.client.host)
-        self._attr_unique_id = f"{serial}_{description.key}"
+        host = coordinator.client.host
+        self._attr_unique_id = f"{host}_{description.key}"
         if description.is_hashrate:
             hr_measure = coordinator.info.get("hr_measure", "GH/s")
             if hr_measure and hr_measure != "N/A":

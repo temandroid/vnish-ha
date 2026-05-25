@@ -23,8 +23,7 @@ class VnishMiningSwitch(VnishEntity, SwitchEntity):
 
     def __init__(self, coordinator: VnishCoordinator) -> None:
         super().__init__(coordinator)
-        serial = coordinator.info.get("serial", coordinator.client.host)
-        self._attr_unique_id = f"{serial}_mining"
+        self._attr_unique_id = f"{coordinator.client.host}_mining"
 
     @property
     def is_on(self) -> bool:

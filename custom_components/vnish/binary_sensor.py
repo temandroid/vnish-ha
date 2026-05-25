@@ -52,8 +52,7 @@ class VnishBinarySensor(VnishEntity, BinarySensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        serial = coordinator.info.get("serial", coordinator.client.host)
-        self._attr_unique_id = f"{serial}_{description.key}"
+        self._attr_unique_id = f"{coordinator.client.host}_{description.key}"
 
     @property
     def is_on(self) -> bool | None:

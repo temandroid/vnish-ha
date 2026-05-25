@@ -62,8 +62,7 @@ class VnishButton(VnishEntity, ButtonEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        serial = coordinator.info.get("serial", coordinator.client.host)
-        self._attr_unique_id = f"{serial}_{description.key}"
+        self._attr_unique_id = f"{coordinator.client.host}_{description.key}"
 
     async def async_press(self) -> None:
         await self.entity_description.action_fn(self.coordinator.client)

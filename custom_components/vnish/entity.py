@@ -13,12 +13,13 @@ class VnishEntity(CoordinatorEntity[VnishCoordinator]):
     def __init__(self, coordinator: VnishCoordinator) -> None:
         super().__init__(coordinator)
         info = coordinator.info
-        serial = info.get("serial", coordinator.client.host)
+        host = coordinator.client.host
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, serial)},
+            identifiers={(DOMAIN, host)},
             name=info.get("miner") or info.get("model", "Vnish Miner"),
             manufacturer="Anthill",
             model=info.get("model"),
             sw_version=info.get("fw_version"),
-            configuration_url=f"http://{coordinator.client.host}",
+            serial_number=info.get("serial"),
+            configuration_url=f"http://{host}",
         )
