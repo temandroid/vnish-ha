@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Vnish Miner",
+        "data": {
+          "host": "IP address or hostname",
+          "api_key": "API key (optional)"
+        },
+        "data_description": {
+          "host": "Local IP address of the miner (e.g. 192.168.1.100)",
+          "api_key": "Leave empty if the miner does not require authentication"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the IP address and make sure the miner is reachable.",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "This miner is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Vnish Miner options",
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "hashrate_rt": {"name": "Hashrate (realtime)"},
+      "hashrate_average": {"name": "Hashrate (average)"},
+      "hashrate_nominal": {"name": "Hashrate (nominal)"},
+      "power_consumption": {"name": "Power consumption"},
+      "power_efficiency": {"name": "Power efficiency"},
+      "pcb_temp_max": {"name": "PCB temperature (max)"},
+      "pcb_temp_min": {"name": "PCB temperature (min)"},
+      "chip_temp_max": {"name": "Chip temperature (max)"},
+      "chip_temp_min": {"name": "Chip temperature (min)"},
+      "fan_duty": {"name": "Fan duty"},
+      "hw_errors_percent": {"name": "HW errors"},
+      "miner_state": {"name": "Miner state"},
+      "restart_count": {"name": "Restart count"},
+      "active_pool": {"name": "Active pool"},
+      "pool_accepted": {"name": "Pool accepted shares"},
+      "pool_rejected": {"name": "Pool rejected shares"},
+      "pool_ping": {"name": "Pool ping"}
+    },
+    "binary_sensor": {
+      "is_mining": {"name": "Mining"}
+    },
+    "button": {
+      "reboot": {"name": "Reboot"},
+      "mining_restart": {"name": "Restart mining"},
+      "mining_pause": {"name": "Pause mining"},
+      "mining_resume": {"name": "Resume mining"}
+    },
+    "switch": {
+      "mining": {"name": "Mining"}
+    }
+  }
+}

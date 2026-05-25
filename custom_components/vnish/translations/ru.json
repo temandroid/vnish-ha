@@ -1,0 +1,67 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Добавить майнер Vnish",
+        "data": {
+          "host": "IP-адрес или имя хоста",
+          "api_key": "API-ключ (необязательно)"
+        },
+        "data_description": {
+          "host": "Локальный IP-адрес майнера (например, 192.168.1.100)",
+          "api_key": "Оставьте пустым, если авторизация не требуется"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться. Проверьте IP-адрес и доступность майнера.",
+      "unknown": "Неожиданная ошибка"
+    },
+    "abort": {
+      "already_configured": "Этот майнер уже добавлен"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки Vnish Miner",
+        "data": {
+          "scan_interval": "Интервал обновления (секунды)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "hashrate_rt": {"name": "Хэшрейт (реальный)"},
+      "hashrate_average": {"name": "Хэшрейт (средний)"},
+      "hashrate_nominal": {"name": "Хэшрейт (номинальный)"},
+      "power_consumption": {"name": "Потребляемая мощность"},
+      "power_efficiency": {"name": "Эффективность (Дж/ТХ)"},
+      "pcb_temp_max": {"name": "Температура платы (макс)"},
+      "pcb_temp_min": {"name": "Температура платы (мин)"},
+      "chip_temp_max": {"name": "Температура чипа (макс)"},
+      "chip_temp_min": {"name": "Температура чипа (мин)"},
+      "fan_duty": {"name": "Обороты вентиляторов"},
+      "hw_errors_percent": {"name": "Аппаратные ошибки"},
+      "miner_state": {"name": "Состояние майнера"},
+      "restart_count": {"name": "Количество перезапусков"},
+      "active_pool": {"name": "Активный пул"},
+      "pool_accepted": {"name": "Принятые шары пула"},
+      "pool_rejected": {"name": "Отклонённые шары пула"},
+      "pool_ping": {"name": "Пинг пула"}
+    },
+    "binary_sensor": {
+      "is_mining": {"name": "Майнинг"}
+    },
+    "button": {
+      "reboot": {"name": "Перезагрузка"},
+      "mining_restart": {"name": "Перезапустить майнинг"},
+      "mining_pause": {"name": "Пауза майнинга"},
+      "mining_resume": {"name": "Возобновить майнинг"}
+    },
+    "switch": {
+      "mining": {"name": "Майнинг"}
+    }
+  }
+}
