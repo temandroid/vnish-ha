@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Background -->
+  <rect width="256" height="256" rx="40" fill="#0d1117"/>
+
+  <!-- Chip body -->
+  <rect x="58" y="58" width="140" height="140" rx="12" fill="#161b22" stroke="#30c97e" stroke-width="2.5"/>
+
+  <!-- Chip inner highlight -->
+  <rect x="72" y="72" width="112" height="112" rx="6" fill="#0d1117"/>
+
+  <!-- Pins left -->
+  <rect x="36" y="86"  width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="36" y="106" width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="36" y="126" width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="36" y="146" width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="36" y="166" width="22" height="9" rx="3" fill="#30c97e"/>
+
+  <!-- Pins right -->
+  <rect x="198" y="86"  width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="198" y="106" width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="198" y="126" width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="198" y="146" width="22" height="9" rx="3" fill="#30c97e"/>
+  <rect x="198" y="166" width="22" height="9" rx="3" fill="#30c97e"/>
+
+  <!-- Pins top -->
+  <rect x="86"  y="36" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="106" y="36" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="126" y="36" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="146" y="36" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="166" y="36" width="9" height="22" rx="3" fill="#30c97e"/>
+
+  <!-- Pins bottom -->
+  <rect x="86"  y="198" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="106" y="198" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="126" y="198" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="146" y="198" width="9" height="22" rx="3" fill="#30c97e"/>
+  <rect x="166" y="198" width="9" height="22" rx="3" fill="#30c97e"/>
+
+  <!-- Big V letter -->
+  <text x="128" y="155"
+        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+        font-size="90" font-weight="900"
+        text-anchor="middle"
+        fill="#30c97e"
+        letter-spacing="-4">V</text>
+
+  <!-- Small "nish" under V -->
+  <text x="128" y="175"
+        font-family="'Arial', sans-serif"
+        font-size="22" font-weight="700"
+        text-anchor="middle"
+        fill="#58a06a"
+        letter-spacing="8">nish</text>
+</svg>
