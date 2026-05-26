@@ -17,8 +17,10 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_get_clientsession(hass)
-    api_key = entry.options.get(CONF_API_KEY) or entry.data.get(CONF_API_KEY) or None
-    password = entry.options.get(CONF_PASSWORD) or entry.data.get(CONF_PASSWORD) or None
+    # Use .get(key, fallback) so that an empty string in options ("key cleared")
+    # does NOT fall through to the original value in entry.data.
+    api_key = entry.options.get(CONF_API_KEY, entry.data.get(CONF_API_KEY)) or None
+    password = entry.options.get(CONF_PASSWORD, entry.data.get(CONF_PASSWORD)) or None
     client = VnishApiClient(
         host=entry.data[CONF_HOST],
         api_key=api_key,

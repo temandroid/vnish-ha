@@ -74,25 +74,22 @@ class VnishOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
 
-        current_api_key = (
-            self._config_entry.options.get(CONF_API_KEY)
-            or self._config_entry.data.get(CONF_API_KEY)
-            or ""
+        # Use .get(key, fallback) so that "" in options correctly means "cleared".
+        current_api_key = self._config_entry.options.get(
+            CONF_API_KEY, self._config_entry.data.get(CONF_API_KEY) or ""
         )
-        current_password = (
-            self._config_entry.options.get(CONF_PASSWORD)
-            or self._config_entry.data.get(CONF_PASSWORD)
-            or ""
+        current_password = self._config_entry.options.get(
+            CONF_PASSWORD, self._config_entry.data.get(CONF_PASSWORD) or ""
         )
 
         if user_input is not None:
             new_api_key = user_input.get(CONF_API_KEY) or None
-            new_password_input = user_input.get(CONF_PASSWORD, "")
-            # empty password field = keep existing
-            password = new_password_input or current_password or None
+            # Empty password field = explicitly remove password authentication.
+            # The field is pre-filled, so users must clear it intentionally.
+            password = user_input.get(CONF_PASSWORD) or None
 
-            credentials_changed = bool(new_password_input) or (
-                (user_input.get(CONF_API_KEY) or "") != current_api_key
+            credentials_changed = (user_input.get(CONF_API_KEY, "") != current_api_key) or (
+                (user_input.get(CONF_PASSWORD, "") != current_password)
             )
             if credentials_changed:
                 try:
@@ -118,7 +115,7 @@ class VnishOptionsFlow(config_entries.OptionsFlow):
                     title="",
                     data={
                         CONF_API_KEY: user_input.get(CONF_API_KEY, ""),
-                        CONF_PASSWORD: password or "",
+                        CONF_PASSWORD: user_input.get(CONF_PASSWORD, ""),
                         CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
                     },
                 )
@@ -128,7 +125,7 @@ class VnishOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_API_KEY, default=current_api_key): str,
-                    vol.Optional(CONF_PASSWORD, default=""): str,
+                    vol.Optional(CONF_PASSWORD, default=current_password): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
                         default=self._config_entry.options.get(

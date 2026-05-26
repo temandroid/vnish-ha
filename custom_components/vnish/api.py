@@ -57,12 +57,18 @@ class VnishApiClient:
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self._base}{path}"
         for attempt in range(2):
+            # Re-login at the START of the retry iteration so the previous
+            # response context manager is already closed before we open a
+            # new connection to /unlock.
+            if attempt == 1 and self._password:
+                await self.login()
             try:
                 async with self._session.request(
                     method, url, headers=self._headers, timeout=self._TIMEOUT, **kwargs
                 ) as resp:
                     if resp.status == 401 and self._password and attempt == 0:
-                        await self.login()
+                        # Signal retry: exit the context manager cleanly, then
+                        # login() will be called at the top of the next iteration.
                         continue
                     resp.raise_for_status()
                     if resp.content_type == "application/json":
@@ -76,12 +82,12 @@ class VnishApiClient:
                 raise VnishApiError(str(err)) from err
 
     async def _command(self, path: str, **kwargs: Any) -> None:
-        """Send a control command; HTTP 5xx is treated as a warning (not an error).
+        """Send a control command; HTTP 500 is treated as a warning (not an error).
 
-        Vnish firmware returns 500 when a command is not applicable in the
-        current state (e.g. start while already mining).  Raising an exception
-        in that case breaks HA automations, so we swallow 5xx and log instead.
-        Network-level errors and auth failures still propagate normally.
+        Vnish firmware returns exactly HTTP 500 when a command is not applicable
+        in the current state (e.g. start while already mining).  Raising an
+        exception in that case breaks HA automations, so we swallow it and log.
+        All other errors (network, auth, 503/504, …) still propagate normally.
         """
         try:
             await self._request("POST", path, **kwargs)
@@ -92,12 +98,11 @@ class VnishApiClient:
                 status = int(msg.split()[1])
             except (IndexError, ValueError):
                 status = 0
-            if 500 <= status <= 599:
+            if status == 500:
                 _LOGGER.warning(
-                    "Control command %s returned HTTP %s — firmware may have "
-                    "rejected the command in the current state (ignored)",
+                    "Control command %s returned HTTP 500 — firmware rejected "
+                    "the command in the current state (ignored)",
                     path,
-                    status,
                 )
             else:
                 raise
