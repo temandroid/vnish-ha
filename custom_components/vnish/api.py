@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import logging
+
 import aiohttp
 from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class VnishApiError(Exception):
@@ -71,6 +75,33 @@ class VnishApiClient:
             except aiohttp.ClientError as err:
                 raise VnishApiError(str(err)) from err
 
+    async def _command(self, path: str, **kwargs: Any) -> None:
+        """Send a control command; HTTP 5xx is treated as a warning (not an error).
+
+        Vnish firmware returns 500 when a command is not applicable in the
+        current state (e.g. start while already mining).  Raising an exception
+        in that case breaks HA automations, so we swallow 5xx and log instead.
+        Network-level errors and auth failures still propagate normally.
+        """
+        try:
+            await self._request("POST", path, **kwargs)
+        except VnishApiError as err:
+            msg = str(err)
+            # Extract status code from "HTTP NNN for /path"
+            try:
+                status = int(msg.split()[1])
+            except (IndexError, ValueError):
+                status = 0
+            if 500 <= status <= 599:
+                _LOGGER.warning(
+                    "Control command %s returned HTTP %s — firmware may have "
+                    "rejected the command in the current state (ignored)",
+                    path,
+                    status,
+                )
+            else:
+                raise
+
     async def get_summary(self) -> dict:
         return await self._request("GET", "/summary")
 
@@ -81,22 +112,22 @@ class VnishApiClient:
         return await self._request("GET", "/status")
 
     async def mining_start(self) -> None:
-        await self._request("POST", "/mining/start")
+        await self._command("/mining/start")
 
     async def mining_stop(self) -> None:
-        await self._request("POST", "/mining/stop")
+        await self._command("/mining/stop")
 
     async def mining_pause(self) -> None:
-        await self._request("POST", "/mining/pause")
+        await self._command("/mining/pause")
 
     async def mining_resume(self) -> None:
-        await self._request("POST", "/mining/resume")
+        await self._command("/mining/resume")
 
     async def mining_restart(self) -> None:
-        await self._request("POST", "/mining/restart")
+        await self._command("/mining/restart")
 
     async def system_reboot(self) -> None:
-        await self._request("POST", "/system/reboot")
+        await self._command("/system/reboot")
 
     async def switch_pool(self, pool_id: int) -> None:
-        await self._request("POST", "/mining/switch-pool", json={"pool_id": pool_id})
+        await self._command("/mining/switch-pool", json={"pool_id": pool_id})

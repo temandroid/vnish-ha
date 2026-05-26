@@ -6,6 +6,6 @@
   "issue_tracker": "https://github.com/temandroid/vnish-ha/issues",
   "requirements": [],
   "iot_class": "local_polling",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "codeowners": ["@itmedia"]
 }
