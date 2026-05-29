@@ -126,6 +126,58 @@ async def test_form_duplicate(hass):
     assert result3["reason"] == "already_configured"
 
 
+async def test_reauth_flow_success(hass, mock_api):
+    """Reauth flow validates new credentials and updates the entry."""
+    entry = await _setup_entry(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_REAUTH, "entry_id": entry.entry_id},
+        data=entry.data,
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.login",
+        new_callable=AsyncMock,
+    ), patch(
+        "custom_components.vnish.config_flow.VnishApiClient.get_info",
+        new_callable=AsyncMock,
+        return_value=MOCK_INFO,
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PASSWORD: "newsecret"}
+        )
+
+    assert result2["type"] == FlowResultType.ABORT
+    assert result2["reason"] == "reauth_successful"
+    assert entry.options[CONF_PASSWORD] == "newsecret"
+
+
+async def test_reauth_flow_invalid_auth(hass, mock_api):
+    """Reauth flow shows invalid_auth when new credentials are wrong."""
+    entry = await _setup_entry(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_REAUTH, "entry_id": entry.entry_id},
+        data=entry.data,
+    )
+
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.login",
+        new_callable=AsyncMock,
+        side_effect=VnishAuthError("Authentication failed (HTTP 401)"),
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_PASSWORD: "stillwrong"}
+        )
+
+    assert result2["type"] == FlowResultType.FORM
+    assert result2["errors"]["base"] == "invalid_auth"
+
+
 async def test_options_flow_scan_interval(hass, mock_api):
     """Options flow saves scan_interval."""
     entry = await _setup_entry(hass)

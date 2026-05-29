@@ -10,13 +10,15 @@ from .coordinator import VnishCoordinator
 class VnishEntity(CoordinatorEntity[VnishCoordinator]):
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: VnishCoordinator) -> None:
-        super().__init__(coordinator)
-        info = coordinator.info
-        host = coordinator.client.host
-        self._attr_device_info = DeviceInfo(
+    @property
+    def device_info(self) -> DeviceInfo:
+        # Built dynamically so the device card fills in once the coordinator
+        # backfills static info (the miner may have been offline at startup).
+        info = self.coordinator.info
+        host = self.coordinator.client.host
+        return DeviceInfo(
             identifiers={(DOMAIN, host)},
-            name=info.get("miner") or info.get("model", "Vnish Miner"),
+            name=info.get("miner") or info.get("model") or "Vnish Miner",
             manufacturer="Anthill",
             model=info.get("model"),
             sw_version=info.get("fw_version"),

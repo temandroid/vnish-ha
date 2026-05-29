@@ -9,7 +9,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class VnishApiError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 class VnishAuthError(VnishApiError):
@@ -27,7 +29,6 @@ class VnishApiClient:
         session: aiohttp.ClientSession,
     ) -> None:
         self._base = f"http://{host}/api/v1"
-        self._api_key = api_key
         self._password = password
         self._session = session
         self.host = host
@@ -40,19 +41,20 @@ class VnishApiClient:
                 "POST", url, json={"pw": self._password}, timeout=self._TIMEOUT
             ) as resp:
                 if resp.status in (401, 403):
-                    raise VnishAuthError(f"Authentication failed (HTTP {resp.status})")
+                    raise VnishAuthError(
+                        f"Authentication failed (HTTP {resp.status})", status=resp.status
+                    )
                 resp.raise_for_status()
                 data = await resp.json()
         except VnishAuthError:
             raise
         except aiohttp.ClientResponseError as err:
-            raise VnishApiError(f"HTTP {err.status} for /unlock") from err
+            raise VnishApiError(f"HTTP {err.status} for /unlock", status=err.status) from err
         except aiohttp.ClientError as err:
             raise VnishApiError(str(err)) from err
-        token = data.get("token")
-        if not token:
+        if not isinstance(data, dict) or not data.get("token"):
             raise VnishAuthError("No token in /unlock response")
-        self._headers = {"Authorization": f"Bearer {token}"}
+        self._headers = {"Authorization": f"Bearer {data['token']}"}
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self._base}{path}"
@@ -67,9 +69,14 @@ class VnishApiClient:
                     method, url, headers=self._headers, timeout=self._TIMEOUT, **kwargs
                 ) as resp:
                     if resp.status == 401 and self._password and attempt == 0:
-                        # Signal retry: exit the context manager cleanly, then
-                        # login() will be called at the top of the next iteration.
+                        # Token likely expired: exit the context manager cleanly,
+                        # then login() runs at the top of the next iteration.
                         continue
+                    if resp.status in (401, 403):
+                        raise VnishAuthError(
+                            f"Authentication failed (HTTP {resp.status})",
+                            status=resp.status,
+                        )
                     resp.raise_for_status()
                     if resp.content_type == "application/json":
                         return await resp.json()
@@ -77,9 +84,12 @@ class VnishApiClient:
             except VnishAuthError:
                 raise
             except aiohttp.ClientResponseError as err:
-                raise VnishApiError(f"HTTP {err.status} for {path}") from err
+                raise VnishApiError(f"HTTP {err.status} for {path}", status=err.status) from err
             except aiohttp.ClientError as err:
                 raise VnishApiError(str(err)) from err
+        # Unreachable: attempt 0 may `continue`, but attempt 1 always returns or
+        # raises above. Guard against silent None just in case.
+        raise VnishAuthError("Authentication failed after retry", status=401)
 
     async def _command(self, path: str, **kwargs: Any) -> None:
         """Send a control command; HTTP 500 is treated as a warning (not an error).
@@ -91,14 +101,10 @@ class VnishApiClient:
         """
         try:
             await self._request("POST", path, **kwargs)
+        except VnishAuthError:
+            raise
         except VnishApiError as err:
-            msg = str(err)
-            # Extract status code from "HTTP NNN for /path"
-            try:
-                status = int(msg.split()[1])
-            except (IndexError, ValueError):
-                status = 0
-            if status == 500:
+            if err.status == 500:
                 _LOGGER.warning(
                     "Control command %s returned HTTP 500 — firmware rejected "
                     "the command in the current state (ignored)",
@@ -112,9 +118,6 @@ class VnishApiClient:
 
     async def get_info(self) -> dict:
         return await self._request("GET", "/info")
-
-    async def get_status(self) -> dict:
-        return await self._request("GET", "/status")
 
     async def mining_start(self) -> None:
         await self._command("/mining/start")

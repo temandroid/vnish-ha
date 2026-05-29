@@ -13,6 +13,14 @@
           "api_key": "Leave empty if the miner does not require authentication",
           "password": "Miner web interface password (takes priority over API key)"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Vnish Miner",
+        "description": "Credentials for {host} are no longer valid. Enter the API key or password again.",
+        "data": {
+          "api_key": "API key",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -21,7 +29,8 @@
       "unknown": "Unexpected error occurred"
     },
     "abort": {
-      "already_configured": "This miner is already configured"
+      "already_configured": "This miner is already configured",
+      "reauth_successful": "Re-authentication was successful"
     }
   },
   "options": {

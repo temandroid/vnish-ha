@@ -29,14 +29,19 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
     async def _async_update_data(self) -> dict:
         try:
             data = await self.client.get_summary()
-            # Retry get_info() if it failed at startup (miner was offline)
-            if not self.info:
-                try:
-                    self.info = await self.client.get_info()
-                except VnishApiError as err:
-                    _LOGGER.debug("Could not fetch miner info (will retry): %s", err)
-            return data
         except VnishAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except VnishApiError as err:
             raise UpdateFailed(str(err)) from err
+
+        # Best-effort: backfill static info if it was missing at startup.
+        # Auth failures here must still surface (so re-auth is triggered);
+        # other transient errors are logged and retried on the next cycle.
+        if not self.info:
+            try:
+                self.info = await self.client.get_info()
+            except VnishAuthError as err:
+                raise ConfigEntryAuthFailed(str(err)) from err
+            except VnishApiError as err:
+                _LOGGER.debug("Could not fetch miner info (will retry): %s", err)
+        return data

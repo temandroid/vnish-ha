@@ -1,17 +1,46 @@
 from __future__ import annotations
 
+from typing import Any, Mapping
+
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VnishApiClient, VnishApiError, VnishAuthError
 from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 
+async def _validate_connection(
+    hass: HomeAssistant, host: str, api_key: str | None, password: str | None
+) -> dict:
+    """Validate credentials against the miner.
+
+    Returns the /info dict on success. Raises VnishAuthError on bad
+    credentials, VnishApiError on connection problems.
+    """
+    session = async_get_clientsession(hass)
+    client = VnishApiClient(
+        host=host, api_key=api_key, password=password, session=session
+    )
+    if password:
+        await client.login()
+    return await client.get_info()
+
+
+def _errors_for(exc: Exception) -> str:
+    """Map a validation exception to a config-flow error key."""
+    if isinstance(exc, VnishAuthError):
+        return "invalid_auth"
+    if isinstance(exc, VnishApiError):
+        return "cannot_connect"
+    return "unknown"
+
+
 class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
+    _reauth_entry: config_entries.ConfigEntry | None = None
 
     async def async_step_user(
         self, user_input: dict | None = None
@@ -23,22 +52,9 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             password = user_input.get(CONF_PASSWORD) or None
             data = {**user_input, CONF_HOST: host}
             try:
-                session = async_get_clientsession(self.hass)
-                client = VnishApiClient(
-                    host=host,
-                    api_key=api_key,
-                    password=password,
-                    session=session,
-                )
-                if password:
-                    await client.login()
-                info = await client.get_info()
-            except VnishAuthError:
-                errors["base"] = "invalid_auth"
-            except VnishApiError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                errors["base"] = "unknown"
+                info = await _validate_connection(self.hass, host, api_key, password)
+            except Exception as err:  # noqa: BLE001
+                errors["base"] = _errors_for(err)
             else:
                 await self.async_set_unique_id(host)
                 self._abort_if_unique_id_configured()
@@ -54,6 +70,52 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_PASSWORD, default=""): str,
                 }
             ),
+            errors=errors,
+        )
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> config_entries.ConfigFlowResult:
+        self._reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
+        errors: dict[str, str] = {}
+        entry = self._reauth_entry
+        assert entry is not None
+
+        if user_input is not None:
+            api_key = user_input.get(CONF_API_KEY) or None
+            password = user_input.get(CONF_PASSWORD) or None
+            try:
+                await _validate_connection(
+                    self.hass, entry.data[CONF_HOST], api_key, password
+                )
+            except Exception as err:  # noqa: BLE001
+                errors["base"] = _errors_for(err)
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    options={
+                        **entry.options,
+                        CONF_API_KEY: user_input.get(CONF_API_KEY, ""),
+                        CONF_PASSWORD: user_input.get(CONF_PASSWORD, ""),
+                    },
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_API_KEY, default=""): str,
+                    vol.Optional(CONF_PASSWORD, default=""): str,
+                }
+            ),
+            description_placeholders={"host": entry.data[CONF_HOST]},
             errors=errors,
         )
 
@@ -83,32 +145,21 @@ class VnishOptionsFlow(config_entries.OptionsFlow):
         )
 
         if user_input is not None:
-            new_api_key = user_input.get(CONF_API_KEY) or None
-            # Empty password field = explicitly remove password authentication.
-            # The field is pre-filled, so users must clear it intentionally.
+            api_key = user_input.get(CONF_API_KEY) or None
+            # Fields are pre-filled, so clearing one means "remove auth".
             password = user_input.get(CONF_PASSWORD) or None
 
-            credentials_changed = (user_input.get(CONF_API_KEY, "") != current_api_key) or (
-                (user_input.get(CONF_PASSWORD, "") != current_password)
+            credentials_changed = (
+                user_input.get(CONF_API_KEY, "") != current_api_key
+                or user_input.get(CONF_PASSWORD, "") != current_password
             )
             if credentials_changed:
                 try:
-                    session = async_get_clientsession(self.hass)
-                    client = VnishApiClient(
-                        host=self._config_entry.data[CONF_HOST],
-                        api_key=new_api_key,
-                        password=password,
-                        session=session,
+                    await _validate_connection(
+                        self.hass, self._config_entry.data[CONF_HOST], api_key, password
                     )
-                    if password:
-                        await client.login()
-                    await client.get_info()
-                except VnishAuthError:
-                    errors["base"] = "invalid_auth"
-                except VnishApiError:
-                    errors["base"] = "cannot_connect"
-                except Exception:  # noqa: BLE001
-                    errors["base"] = "unknown"
+                except Exception as err:  # noqa: BLE001
+                    errors["base"] = _errors_for(err)
 
             if not errors:
                 return self.async_create_entry(

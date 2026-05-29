@@ -188,12 +188,17 @@ class VnishSensor(VnishEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
-        host = coordinator.client.host
-        self._attr_unique_id = f"{host}_{description.key}"
-        if description.is_hashrate:
-            hr_measure = coordinator.info.get("hr_measure", "GH/s")
+        self._attr_unique_id = f"{coordinator.client.host}_{description.key}"
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        # Resolved dynamically: hr_measure comes from static info which may be
+        # backfilled after startup. Falls back to the description's default.
+        if self.entity_description.is_hashrate:
+            hr_measure = self.coordinator.info.get("hr_measure")
             if hr_measure and hr_measure != "N/A":
-                self._attr_native_unit_of_measurement = hr_measure
+                return hr_measure
+        return self.entity_description.native_unit_of_measurement
 
     @property
     def native_value(self) -> Any:
