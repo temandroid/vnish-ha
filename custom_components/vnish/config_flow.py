@@ -56,6 +56,9 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception as err:  # noqa: BLE001
                 errors["base"] = _errors_for(err)
             else:
+                # Host IP is guaranteed unique per device on a LAN; the MAC may
+                # be cloned by the firmware, so it is adopted (collision-safely)
+                # only later in setup, never as the add-time dedup key.
                 await self.async_set_unique_id(host)
                 self._abort_if_unique_id_configured()
                 title = info.get("miner") or info.get("model") or host
@@ -86,7 +89,8 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
         entry = self._reauth_entry
-        assert entry is not None
+        if entry is None:
+            return self.async_abort(reason="reauth_failed")
 
         if user_input is not None:
             api_key = user_input.get(CONF_API_KEY) or None

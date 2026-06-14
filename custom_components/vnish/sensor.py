@@ -18,6 +18,8 @@ from .const import DOMAIN
 from .coordinator import VnishCoordinator
 from .entity import VnishEntity
 
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True, kw_only=True)
 class VnishSensorDescription(SensorEntityDescription):

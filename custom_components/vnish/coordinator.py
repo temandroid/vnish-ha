@@ -3,14 +3,20 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import VnishApiClient, VnishApiError, VnishAuthError
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def mac_from_info(info: dict | None) -> str | None:
+    """Extract and normalise the MAC address from a /info payload."""
+    mac = (((info or {}).get("system") or {}).get("network_status") or {}).get("mac")
+    return format_mac(mac) if mac else None
 
 
 class VnishCoordinator(DataUpdateCoordinator[dict]):
@@ -25,6 +31,10 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
         )
         self.client = client
         self.info: dict = {}
+        # Stable device identity, resolved once during setup (MAC if available,
+        # otherwise the host IP). Kept constant for the session to avoid the
+        # device being re-keyed mid-run.
+        self.device_id: str = client.host
 
     async def _async_update_data(self) -> dict:
         try:
@@ -39,7 +49,10 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
         # other transient errors are logged and retried on the next cycle.
         if not self.info:
             try:
-                self.info = await self.client.get_info()
+                info = await self.client.get_info()
+                # Guard against a malformed /info (None / list) permanently
+                # poisoning consumers that call self.info.get(...).
+                self.info = info if isinstance(info, dict) else {}
             except VnishAuthError as err:
                 raise ConfigEntryAuthFailed(str(err)) from err
             except VnishApiError as err:

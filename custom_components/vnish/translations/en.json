@@ -30,7 +30,8 @@
     },
     "abort": {
       "already_configured": "This miner is already configured",
-      "reauth_successful": "Re-authentication was successful"
+      "reauth_successful": "Re-authentication was successful",
+      "reauth_failed": "Re-authentication failed; please remove and re-add the integration"
     }
   },
   "options": {
@@ -80,6 +81,9 @@
     },
     "switch": {
       "mining": {"name": "Mining"}
+    },
+    "select": {
+      "pool": {"name": "Pool"}
     }
   }
 }

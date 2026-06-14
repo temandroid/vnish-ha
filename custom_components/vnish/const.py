@@ -1,7 +1,13 @@
 from homeassistant.const import Platform
 
 DOMAIN = "vnish"
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SWITCH]
+PLATFORMS = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SWITCH,
+    Platform.SELECT,
+]
 
 CONF_API_KEY = "api_key"
 CONF_PASSWORD = "password"
