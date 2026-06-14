@@ -5,6 +5,33 @@ import pytest
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
+
+@pytest.fixture(autouse=True, scope="session")
+def _warm_pycares_shutdown_thread():
+    """Pre-start the aiodns/pycares DNS-shutdown daemon thread.
+
+    pycares starts a daemon thread lazily the first time a DNS channel is
+    destroyed (HA's aiohttp session uses the aiodns resolver). HA's per-test
+    ``verify_cleanup`` snapshots threads before each test and fails if a new
+    one appears, so whichever test first triggers it would spuriously error.
+    Starting it once up-front (before any per-test snapshot) keeps it out of
+    the diff. Not a defect in the integration — purely test-harness hygiene.
+    """
+    try:
+        import pycares
+
+        pycares._shutdown_manager.start()
+    except Exception:  # noqa: BLE001 — best-effort warm-up only
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Enable loading of the vnish custom integration in every test."""
+    yield
+
+
 MOCK_HOST = "192.168.1.100"
 MOCK_API_KEY = "test-api-key"
 
