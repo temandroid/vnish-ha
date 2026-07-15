@@ -5,7 +5,7 @@ import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, STATE_OFF, STATE_ON
 
-from custom_components.vnish.const import DOMAIN
+from custom_components.vnish.const import DOMAIN, OPTIMISTIC_MAX_CYCLES
 
 from .conftest import MOCK_HOST, MOCK_INFO, MOCK_SUMMARY, MOCK_SUMMARY_STOPPED
 
@@ -75,3 +75,79 @@ async def test_turn_on_calls_mining_start(hass):
             "switch", "turn_on", {"entity_id": SWITCH_ID}, blocking=True
         )
         mock_start.assert_called_once()
+
+
+async def test_optimistic_state_hides_the_transition(hass):
+    """The switch reports the commanded state while the miner spins up.
+
+    Without this the immediate post-command refresh still reads 'stopped' and
+    the toggle visibly bounces back.
+    """
+    entry = await _setup(hass, MOCK_SUMMARY_STOPPED)
+
+    with patch(
+        "custom_components.vnish.api.VnishApiClient.mining_start",
+        new_callable=AsyncMock,
+        return_value=True,
+    ), patch(
+        "custom_components.vnish.api.VnishApiClient.get_summary",
+        new_callable=AsyncMock,
+        return_value=MOCK_SUMMARY_STOPPED,  # miner still catching up
+    ):
+        await hass.services.async_call(
+            "switch", "turn_on", {"entity_id": SWITCH_ID}, blocking=True
+        )
+        await hass.async_block_till_done()
+        assert hass.states.get(SWITCH_ID).state == STATE_ON
+
+
+async def test_optimistic_state_gives_up_if_miner_never_starts(hass):
+    """A command the miner accepts but never acts on must stop masking reality.
+
+    Otherwise a hardware-faulted miner shows a permanently ON switch while
+    binary_sensor.mining correctly stays off.
+    """
+    entry = await _setup(hass, MOCK_SUMMARY_STOPPED)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    with patch(
+        "custom_components.vnish.api.VnishApiClient.mining_start",
+        new_callable=AsyncMock,
+        return_value=True,
+    ), patch(
+        "custom_components.vnish.api.VnishApiClient.get_summary",
+        new_callable=AsyncMock,
+        return_value=MOCK_SUMMARY_STOPPED,  # never transitions
+    ):
+        await hass.services.async_call(
+            "switch", "turn_on", {"entity_id": SWITCH_ID}, blocking=True
+        )
+        await hass.async_block_till_done()
+        assert hass.states.get(SWITCH_ID).state == STATE_ON  # optimistic
+
+        for _ in range(OPTIMISTIC_MAX_CYCLES + 1):
+            await coordinator.async_refresh()
+            await hass.async_block_till_done()
+
+    assert hass.states.get(SWITCH_ID).state == STATE_OFF  # reality wins
+
+
+async def test_rejected_command_never_lies(hass):
+    """A swallowed HTTP 500 means 'not applicable' — show the truth at once."""
+    await _setup(hass, MOCK_SUMMARY_STOPPED)
+
+    with patch(
+        "custom_components.vnish.api.VnishApiClient.mining_start",
+        new_callable=AsyncMock,
+        return_value=False,  # firmware rejected it
+    ), patch(
+        "custom_components.vnish.api.VnishApiClient.get_summary",
+        new_callable=AsyncMock,
+        return_value=MOCK_SUMMARY_STOPPED,
+    ):
+        await hass.services.async_call(
+            "switch", "turn_on", {"entity_id": SWITCH_ID}, blocking=True
+        )
+        await hass.async_block_till_done()
+
+    assert hass.states.get(SWITCH_ID).state == STATE_OFF

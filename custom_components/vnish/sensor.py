@@ -32,11 +32,16 @@ def _miner(data: dict) -> dict:
 
 
 def _active_pool(data: dict) -> dict:
-    pools = _miner(data).get("pools") or []
-    for pool in pools:
+    """The pool the miner reports as active, or {} if none is.
+
+    No fallback to pools[0]: reporting an inactive pool's URL and share counts
+    as "active pool" is wrong, and it made these sensors contradict the pool
+    select entity (which correctly reports nothing when no pool is active).
+    """
+    for pool in _miner(data).get("pools") or []:
         if pool.get("status") == "active":
             return pool
-    return pools[0] if pools else {}
+    return {}
 
 
 SENSORS: tuple[VnishSensorDescription, ...] = (

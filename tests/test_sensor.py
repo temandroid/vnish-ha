@@ -93,29 +93,33 @@ async def test_active_pool_uses_status(hass):
     assert state.state == "btc.pool.example.com:3333"
 
 
-async def test_active_pool_fallback_to_first(hass):
-    """Active pool falls back to first pool if none has status='active'."""
+async def test_active_pool_unknown_when_none_active(hass):
+    """With no pool marked active the sensor reports unknown, not pools[0].
+
+    Falling back to the first pool used to report an inactive pool's URL and
+    share counts as if it were active, which also contradicted the pool select.
+    """
     summary_no_active = {
         "miner": {
             **MOCK_SUMMARY["miner"],
             "pools": [
-                {"id": 0, "url": "pool0.example.com:3333", "status": "working", "accepted": 0, "rejected": 0, "ping": 10},
-                {"id": 1, "url": "pool1.example.com:3333", "status": "working", "accepted": 0, "rejected": 0, "ping": 20},
+                {"id": 0, "url": "pool0.example.com:3333", "status": "dead", "accepted": 7, "rejected": 0, "ping": 10},
+                {"id": 1, "url": "pool1.example.com:3333", "status": "dead", "accepted": 0, "rejected": 0, "ping": 20},
             ],
         }
     }
     entry = config_entries.ConfigEntry(
         version=1, minor_version=1, domain=DOMAIN, title="T", data={CONF_HOST: "10.0.0.1"},
-        source=config_entries.SOURCE_USER, options={}, unique_id="FALLBACKTEST", discovery_keys={},
+        source=config_entries.SOURCE_USER, options={}, unique_id="10.0.0.1", discovery_keys={},
     )
     with patch("custom_components.vnish.api.VnishApiClient.get_info", new_callable=AsyncMock, return_value={**MOCK_INFO, "serial": "FALLBACKTEST"}), \
          patch("custom_components.vnish.api.VnishApiClient.get_summary", new_callable=AsyncMock, return_value=summary_no_active):
         await hass.config_entries.async_add(entry)
         await hass.async_block_till_done()
 
-    state = hass.states.get("sensor.antminer_s19k_pro_active_pool")
-    assert state is not None
-    assert "pool0" in state.state or "pool1" in state.state  # first pool
+    assert hass.states.get("sensor.antminer_s19k_pro_active_pool").state == STATE_UNKNOWN
+    # ...and the per-pool stats must not report the dead pool's numbers either.
+    assert hass.states.get("sensor.antminer_s19k_pro_pool_accepted_shares").state == STATE_UNKNOWN
 
 
 async def test_pool_accepted_shares(hass):

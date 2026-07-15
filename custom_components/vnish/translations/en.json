@@ -48,6 +48,11 @@
           "password": "Leave empty to remove password authentication"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the IP address and make sure the miner is reachable.",
+      "invalid_auth": "Invalid credentials. Check the API key or password.",
+      "unknown": "Unexpected error occurred"
     }
   },
   "entity": {

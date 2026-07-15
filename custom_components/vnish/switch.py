@@ -5,7 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ACTIVE_MINING_STATES, DOMAIN
+from .const import ACTIVE_MINING_STATES, DOMAIN, OPTIMISTIC_MAX_CYCLES
 from .coordinator import VnishCoordinator
 from .entity import VnishEntity
 
@@ -36,11 +36,20 @@ class VnishMiningSwitch(VnishEntity, SwitchEntity):
         # (its state machine takes a few seconds), to avoid the toggle bouncing
         # back on the immediate post-command refresh.
         self._optimistic: bool | None = None
+        self._optimistic_cycles = 0
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        if self._optimistic is not None and _is_mining(self.coordinator.data) == self._optimistic:
-            self._optimistic = None
+        if self._optimistic is not None:
+            if _is_mining(self.coordinator.data) == self._optimistic:
+                self._optimistic = None
+            else:
+                # Give up after a bounded number of polls: a miner that never
+                # reaches the commanded state (hardware fault, rejected start)
+                # must not be masked by an optimistic value forever.
+                self._optimistic_cycles += 1
+                if self._optimistic_cycles >= OPTIMISTIC_MAX_CYCLES:
+                    self._optimistic = None
         super()._handle_coordinator_update()
 
     @property
@@ -52,11 +61,15 @@ class VnishMiningSwitch(VnishEntity, SwitchEntity):
     async def _set_mining(self, turn_on: bool) -> None:
         # Send the command first so a failure surfaces and leaves state intact.
         if turn_on:
-            await self.coordinator.client.mining_start()
+            accepted = await self.coordinator.client.mining_start()
         else:
-            await self.coordinator.client.mining_stop()
-        self._optimistic = turn_on
-        self.async_write_ha_state()
+            accepted = await self.coordinator.client.mining_stop()
+        # Only pretend when the miner actually took the command: a rejected one
+        # (swallowed HTTP 500) must show the real state immediately.
+        if accepted:
+            self._optimistic = turn_on
+            self._optimistic_cycles = 0
+            self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self, **kwargs: object) -> None:

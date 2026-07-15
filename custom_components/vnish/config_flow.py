@@ -12,6 +12,17 @@ from .api import VnishApiClient, VnishApiError, VnishAuthError
 from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 
+def _normalise_host(raw: str) -> str:
+    """Reduce user input to a bare host[:port].
+
+    Accepts a pasted URL ('http://192.168.1.5/docs/') as well as a plain
+    address. The path is dropped rather than only the trailing slash, so a
+    pasted deep link does not end up inside the API base URL.
+    """
+    host = raw.strip().removeprefix("http://").removeprefix("https://")
+    return host.split("/")[0].strip()
+
+
 async def _validate_connection(
     hass: HomeAssistant, host: str, api_key: str | None, password: str | None
 ) -> dict:
@@ -26,7 +37,13 @@ async def _validate_connection(
     )
     if password:
         await client.login()
-    return await client.get_info()
+    info = await client.get_info()
+    # A wrong IP / captive portal can answer 200 with a non-JSON body (-> None)
+    # or with JSON null/list. Turn that into cannot_connect rather than letting
+    # an AttributeError escape the flow when the caller does info.get(...).
+    if not isinstance(info, dict):
+        raise VnishApiError(f"Malformed /info payload: {type(info).__name__}")
+    return info
 
 
 def _errors_for(exc: Exception) -> str:
@@ -47,7 +64,7 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            host = user_input[CONF_HOST].strip().removeprefix("http://").removeprefix("https://").rstrip("/")
+            host = _normalise_host(user_input[CONF_HOST])
             api_key = user_input.get(CONF_API_KEY) or None
             password = user_input.get(CONF_PASSWORD) or None
             data = {**user_input, CONF_HOST: host}
@@ -56,6 +73,11 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception as err:  # noqa: BLE001
                 errors["base"] = _errors_for(err)
             else:
+                # Dedup on the host stored in entry.data. This must NOT rely on
+                # unique_id: setup re-keys the entry from host to MAC once the
+                # MAC proves unique, after which a host-based unique_id lookup
+                # would no longer match and the same miner could be added twice.
+                self._async_abort_entries_match({CONF_HOST: host})
                 # Host IP is guaranteed unique per device on a LAN; the MAC may
                 # be cloned by the firmware, so it is adopted (collision-safely)
                 # only later in setup, never as the add-time dedup key.

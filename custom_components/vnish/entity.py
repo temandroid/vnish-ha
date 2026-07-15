@@ -6,6 +6,7 @@ from homeassistant.helpers.device_registry import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api import format_host
 from .const import DOMAIN
 from .coordinator import VnishCoordinator, mac_from_info
 
@@ -15,8 +16,10 @@ class VnishEntity(CoordinatorEntity[VnishCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        # Built dynamically so the device card fills in once the coordinator
-        # backfills static info (the miner may have been offline at startup).
+        # NOTE: HA reads this only when the entity is added, so it is a snapshot
+        # of whatever info was known by then — it does not self-update. A late
+        # /info backfill refreshes the card via
+        # VnishCoordinator._async_refresh_device_card() instead.
         coordinator = self.coordinator
         info = coordinator.info
         host = coordinator.client.host
@@ -35,5 +38,5 @@ class VnishEntity(CoordinatorEntity[VnishCoordinator]):
             model=info.get("model"),
             sw_version=info.get("fw_version"),
             serial_number=info.get("serial"),
-            configuration_url=f"http://{host}",
+            configuration_url=f"http://{format_host(host)}",
         )

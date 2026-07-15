@@ -18,6 +18,7 @@ TO_REDACT = {
     "gateway",
     "dns",
     "hostname",
+    "miner_name",
     "user",
     "url",
     "serial",

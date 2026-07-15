@@ -4,7 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VnishApiClient, VnishApiError, VnishAuthError
@@ -70,13 +70,22 @@ def _migrate_device_identity(
 ) -> None:
     """Re-key a legacy host-IP device/entry to the stable MAC-based identity.
 
-    Idempotent: only acts while the old host-keyed device still exists and no
-    MAC-keyed device has been created yet.
+    Idempotent, and tolerant of the state where both a host-keyed and a
+    MAC-keyed device exist (a transient /info failure can re-create the former
+    after the latter was already adopted): the leftover is merged away instead
+    of lingering as a phantom device.
     """
     dev_reg = dr.async_get(hass)
     old_device = dev_reg.async_get_device(identifiers={(DOMAIN, host)})
     new_device = dev_reg.async_get_device(identifiers={(DOMAIN, device_id)})
-    if old_device and not new_device:
+    if old_device and new_device and old_device.id != new_device.id:
+        ent_reg = er.async_get(hass)
+        for ent in er.async_entries_for_device(
+            ent_reg, old_device.id, include_disabled_entities=True
+        ):
+            ent_reg.async_update_entity(ent.entity_id, device_id=new_device.id)
+        dev_reg.async_remove_device(old_device.id)
+    elif old_device:
         dev_reg.async_update_device(
             old_device.id, new_identifiers={(DOMAIN, device_id)}
         )
