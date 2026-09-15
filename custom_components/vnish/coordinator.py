@@ -27,7 +27,11 @@ def mac_from_info(info: dict | None) -> str | None:
 
 class VnishCoordinator(DataUpdateCoordinator[dict]):
     def __init__(
-        self, hass: HomeAssistant, client: VnishApiClient, scan_interval: int
+        self,
+        hass: HomeAssistant,
+        client: VnishApiClient,
+        scan_interval: int,
+        fallback_name: str = "Vnish Miner",
     ) -> None:
         super().__init__(
             hass,
@@ -37,6 +41,10 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
         )
         self.client = client
         self.info: dict = {}
+        # Device name to use until /info answers. The config entry title is the
+        # name the miner reported when it was added, so a miner that is offline
+        # at startup keeps its real name instead of being renamed to a placeholder.
+        self.fallback_name = fallback_name
         # Stable device identity, resolved once during setup (MAC if available,
         # otherwise the host IP). Kept constant for the session to avoid the
         # device being re-keyed mid-run.
@@ -91,7 +99,7 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
             return
         dr.async_get(self.hass).async_update_device(
             device.id,
-            name=self.info.get("miner") or self.info.get("model") or "Vnish Miner",
+            name=self.info.get("miner") or self.info.get("model") or self.fallback_name,
             model=self.info.get("model"),
             sw_version=self.info.get("fw_version"),
             serial_number=self.info.get("serial"),

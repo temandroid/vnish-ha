@@ -3,11 +3,10 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import VnishApiClient, VnishApiError, VnishAuthError
+from .api import VnishApiClient
 from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
 from .coordinator import VnishCoordinator, mac_from_info
 
@@ -26,20 +25,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         session=session,
     )
 
-    if password:
-        try:
-            await client.login()
-        except VnishAuthError as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
-        except VnishApiError as err:
-            raise ConfigEntryNotReady(str(err)) from err
-
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    coordinator = VnishCoordinator(hass, client, scan_interval)
+    coordinator = VnishCoordinator(
+        hass, client, scan_interval, fallback_name=entry.title
+    )
 
-    # Static info (model, serial, hr_measure, MAC) is fetched by the coordinator
-    # on its first refresh and backfilled later if the miner was offline.
-    await coordinator.async_config_entry_first_refresh()
+    # An identity adopted on an earlier run survives a restart in entry.unique_id.
+    # Reuse it even while the miner is unreachable: recomputing it from an empty
+    # /info would fall back to the host and register a SECOND, duplicate device
+    # alongside the MAC-keyed one that already holds the user's history.
+    if entry.unique_id and entry.unique_id != host:
+        coordinator.device_id = entry.unique_id
+
+    # Deliberately NOT async_config_entry_first_refresh(): miners are routinely
+    # powered off (electricity tariffs, summer heat), and refusing to set up
+    # would drop all of their entities and flag the entry as "needs attention".
+    # Load anyway; entities report unavailable until the miner answers again.
+    # An auth failure still surfaces — the coordinator starts the reauth flow.
+    await coordinator.async_refresh()
 
     # Adopt the MAC as a stable, DHCP-resilient identity — but ONLY if it is
     # unique across configured miners. Vnish firmware is known to clone

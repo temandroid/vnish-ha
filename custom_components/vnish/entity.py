@@ -33,7 +33,7 @@ class VnishEntity(CoordinatorEntity[VnishCoordinator]):
         return DeviceInfo(
             identifiers={(DOMAIN, coordinator.device_id)},
             connections=connections,
-            name=info.get("miner") or info.get("model") or "Vnish Miner",
+            name=info.get("miner") or info.get("model") or coordinator.fallback_name,
             manufacturer="Anthill",
             model=info.get("model"),
             sw_version=info.get("fw_version"),
