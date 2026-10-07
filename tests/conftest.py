@@ -138,7 +138,23 @@ MOCK_SUMMARY = {
                 "ping": 0,
             },
         ],
-        "chains": [],
+        "chains": [
+            {
+                "id": 0,
+                "hashrate_rt": 11488.6,
+                "hashrate_ideal": 11735.0,
+                "hashrate_percentage": 97.9,
+                "pcb_temp": {"min": 43, "max": 48},
+                "chip_temp": {"min": 58, "max": 62},
+                "hw_errors": 1,
+                "hr_error": 0.0,
+                "frequency": 475.0,
+                "voltage": 1340,
+                "power_consumption": 341,
+                "status": {"state": "mining"},
+                "chip_statuses": {"grey": 0, "orange": 0, "red": 0},
+            }
+        ],
         "psu": None,
     }
 }

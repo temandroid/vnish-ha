@@ -16,7 +16,7 @@ async def _setup(hass, summary=MOCK_SUMMARY):
     entry = config_entries.ConfigEntry(
         version=1, minor_version=1, domain=DOMAIN, title="T",
         data={CONF_HOST: MOCK_HOST}, source=config_entries.SOURCE_USER,
-        options={}, unique_id=MOCK_INFO["serial"], discovery_keys={},
+        options={}, unique_id=MOCK_INFO["serial"], discovery_keys={}, subentries_data={},
     )
     with patch("custom_components.vnish.api.VnishApiClient.get_info", new_callable=AsyncMock, return_value=MOCK_INFO), \
          patch("custom_components.vnish.api.VnishApiClient.get_summary", new_callable=AsyncMock, return_value=summary):

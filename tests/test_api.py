@@ -5,6 +5,7 @@ session, which the entity-level tests never reach (they patch the high-level
 mining_*/get_summary methods wholesale).
 """
 import asyncio
+import logging
 
 import aiohttp
 import pytest
@@ -82,13 +83,15 @@ class _FakeSession:
 
     def request(self, method, url, **kwargs):
         path = str(url).split("/api/v1", 1)[-1]
-        self.calls.append((method, path, dict(kwargs.get("headers") or {})))
+        self.calls.append(
+            (method, path, dict(kwargs.get("headers") or {}), kwargs.get("json"))
+        )
         queue = self._script[path]
         item = queue.pop(0) if len(queue) > 1 else queue[0]
         return item
 
     def paths(self, path: str) -> int:
-        return sum(1 for _, p, _ in self.calls if p == path)
+        return sum(1 for _, p, *_ in self.calls if p == path)
 
 
 def _client(session, *, api_key=None, password=None) -> VnishApiClient:
@@ -126,6 +129,44 @@ async def test_command_swallows_500_from_the_command_endpoint():
     """HTTP 500 from the command itself means 'not applicable in current state'."""
     session = _FakeSession({"/mining/start": [_Resp(status=500)]})
     assert await _client(session).mining_start() is False
+
+
+async def test_command_500_logs_the_err_descr(caplog):
+    """A rejected command carries ErrDescr.err; the call still reports False."""
+    caplog.set_level(logging.WARNING)
+    session = _FakeSession(
+        {"/mining/start": [_Resp(status=500, payload={"err": "already mining"})]}
+    )
+    assert await _client(session).mining_start() is False
+    assert "already mining" in caplog.text
+
+
+async def test_http_error_includes_err_descr():
+    """Non-command HTTP 500 keeps the firmware's ErrDescr text and still raises."""
+    session = _FakeSession({"/summary": [_Resp(status=500, payload={"err": "boom"})]})
+    with pytest.raises(VnishApiError, match="boom") as err:
+        await _client(session).get_summary()
+    assert err.value.status == 500
+
+
+async def test_unlock_429_is_not_an_auth_error():
+    """POST /unlock 429 is 'too many attempts', not a wrong password."""
+    session = _FakeSession(
+        {"/unlock": [_Resp(status=429, payload={"unlock_timeout": 30})]}
+    )
+    with pytest.raises(VnishApiError) as err:
+        await _client(session, password="pw").login()
+    assert type(err.value) is VnishApiError
+    assert err.value.status == 429
+
+
+async def test_mining_throttle_posts_percent():
+    session = _FakeSession({"/mining/throttle": [_Resp(status=200, payload={})]})
+    client = _client(session)
+    assert await client.mining_throttle(80) is True
+    assert session.calls[-1][0] == "POST"
+    assert session.calls[-1][1] == "/mining/throttle"
+    assert session.calls[-1][3] == {"percent": 80}
 
 
 async def test_command_propagates_503():

@@ -15,7 +15,7 @@ async def _setup(hass, summary=MOCK_SUMMARY):
     entry = config_entries.ConfigEntry(
         version=1, minor_version=1, domain=DOMAIN, title="T",
         data={CONF_HOST: MOCK_HOST}, source=config_entries.SOURCE_USER,
-        options={}, unique_id=MOCK_HOST, discovery_keys={},
+        options={}, unique_id=MOCK_HOST, discovery_keys={}, subentries_data={},
     )
     with patch("custom_components.vnish.api.VnishApiClient.get_info", new_callable=AsyncMock, return_value=MOCK_INFO), \
          patch("custom_components.vnish.api.VnishApiClient.get_summary", new_callable=AsyncMock, return_value=summary):
@@ -91,6 +91,38 @@ async def test_pools_sharing_a_url_stay_addressable(hass):
             "select", "select_option", {"entity_id": SELECT_ID, "option": target}, blocking=True
         )
         mock_switch.assert_called_once_with(1)
+
+
+async def test_firmware_pools_are_not_offered(hass):
+    """DevFee and Refund pools are the firmware's, not the user's to switch to."""
+    summary = _summary_with_pools(
+        [
+            {
+                "id": 0,
+                "url": "devfee.example.com:3333",
+                "pool_type": "DevFee",
+                "status": "active",
+            },
+            {
+                "id": 1,
+                "url": "user.example.com:3333",
+                "pool_type": "UserPool",
+                "status": "working",
+            },
+            {
+                "id": 2,
+                "url": "refund.example.com:3333",
+                "pool_type": "Refund",
+                "status": "working",
+            },
+        ]
+    )
+    await _setup(hass, summary)
+
+    options = hass.states.get(SELECT_ID).attributes["options"]
+    assert options == ["user.example.com:3333"]
+    # The DevFee pool is active, but it is not the user's current pool.
+    assert hass.states.get(SELECT_ID).state == STATE_UNKNOWN
 
 
 async def test_pool_without_id_is_not_offered(hass):

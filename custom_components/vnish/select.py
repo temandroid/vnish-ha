@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, OPTIMISTIC_MAX_CYCLES
+from .const import DOMAIN, OPTIMISTIC_MAX_CYCLES, is_user_pool
 from .coordinator import VnishCoordinator
 from .entity import VnishEntity
 
@@ -29,10 +29,18 @@ def _pool_entries(data: dict | None) -> list[_Pool]:
 
     Only pools that have both a URL and an id are offered: an id-less pool
     could be picked but never switched to, which would look like a silent no-op.
+    DevFee and Refund pools belong to the firmware and are not selectable.
     Labels are the URL, disambiguated with the id when two pools share one (a
     common primary/failover pattern), so every pool stays addressable.
     """
-    pools = [p for p in _pools(data) if p.get("url") and p.get("id") is not None]
+    pools = [
+        p
+        for p in _pools(data)
+        if isinstance(p, dict)
+        and p.get("url")
+        and p.get("id") is not None
+        and is_user_pool(p)
+    ]
     urls = [p["url"] for p in pools]
     return [
         _Pool(

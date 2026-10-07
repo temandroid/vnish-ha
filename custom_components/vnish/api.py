@@ -67,6 +67,39 @@ class VnishApiClient:
         """Headers present regardless of JWT state (x-api-key never expires)."""
         return {"x-api-key": self._api_key} if self._api_key else {}
 
+    async def _error_detail(self, resp: aiohttp.ClientResponse) -> str | None:
+        """Return ErrDescr.err from an error body, if the firmware sent one."""
+        if resp.content_type != "application/json":
+            return None
+        try:
+            body = await resp.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError):
+            return None
+        if not isinstance(body, dict):
+            return None
+        err = body.get("err")
+        return err if isinstance(err, str) and err else None
+
+    @staticmethod
+    def _status_error(
+        status: int, endpoint: str, detail: str | None
+    ) -> VnishApiError:
+        """Map an HTTP error to the client exception the rest of the integration uses.
+
+        401/403 are authentication failures. 429 (documented on POST /unlock)
+        stays a plain API error so the config flow can tell "too many attempts"
+        apart from a wrong password.
+        """
+        if status in (401, 403):
+            message = f"Authentication failed (HTTP {status})"
+            exc_type: type[VnishApiError] = VnishAuthError
+        else:
+            message = f"HTTP {status} for {endpoint}"
+            exc_type = VnishApiError
+        if detail:
+            message = f"{message}: {detail}"
+        return exc_type(message, status=status, endpoint=endpoint)
+
     async def login(self) -> None:
         """Force a login (used at setup for fail-fast credential validation)."""
         async with self._login_lock:
@@ -91,13 +124,9 @@ class VnishApiClient:
             async with self._session.request(
                 "POST", url, json={"pw": self._password}, timeout=self._TIMEOUT
             ) as resp:
-                if resp.status in (401, 403):
-                    raise VnishAuthError(
-                        f"Authentication failed (HTTP {resp.status})",
-                        status=resp.status,
-                        endpoint="/unlock",
-                    )
-                resp.raise_for_status()
+                if resp.status >= 400:
+                    detail = await self._error_detail(resp)
+                    raise self._status_error(resp.status, "/unlock", detail)
                 data = await resp.json()
         except VnishAuthError:
             raise
@@ -144,13 +173,9 @@ class VnishApiClient:
                         # exit the context manager cleanly, then re-login & retry.
                         stale_epoch = sent_epoch
                         continue
-                    if resp.status in (401, 403):
-                        raise VnishAuthError(
-                            f"Authentication failed (HTTP {resp.status})",
-                            status=resp.status,
-                            endpoint=path,
-                        )
-                    resp.raise_for_status()
+                    if resp.status >= 400:
+                        detail = await self._error_detail(resp)
+                        raise self._status_error(resp.status, path, detail)
                     if resp.content_type == "application/json":
                         return await resp.json()
                     return None
@@ -178,10 +203,11 @@ class VnishApiClient:
 
         Vnish firmware returns exactly HTTP 500 *from the command endpoint* when
         a command is not applicable in the current state (e.g. start while
-        already mining). Raising there would break HA automations, so that one
-        case is swallowed and reported as False. Everything else still
-        propagates — including a 500 raised by the internal /unlock re-login,
-        which must never be mistaken for "command not applicable".
+        already mining). The OpenAPI describes that response as ErrDescr
+        (`{"err": "..."}`); the text is logged and the call is reported as
+        False so HA automations do not fail. Everything else still propagates —
+        including a 500 raised by the internal /unlock re-login, which must
+        never be mistaken for "command not applicable".
         """
         try:
             await self._request("POST", path, **kwargs)
@@ -191,8 +217,9 @@ class VnishApiClient:
             if err.status == 500 and err.endpoint == path:
                 _LOGGER.warning(
                     "Control command %s returned HTTP 500 — firmware rejected "
-                    "the command in the current state (ignored)",
+                    "the command in the current state (%s)",
                     path,
+                    err,
                 )
                 return False
             raise
@@ -224,3 +251,7 @@ class VnishApiClient:
 
     async def switch_pool(self, pool_id: Any) -> bool:
         return await self._command("/mining/switch-pool", json={"pool_id": pool_id})
+
+    async def mining_throttle(self, percent: int) -> bool:
+        """Set the hashrate throttle. The firmware accepts 20–100 inclusive."""
+        return await self._command("/mining/throttle", json={"percent": int(percent)})

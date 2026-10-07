@@ -27,7 +27,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = VnishCoordinator(
-        hass, client, scan_interval, fallback_name=entry.title
+        hass,
+        client,
+        scan_interval,
+        fallback_name=entry.title,
+        config_entry=entry,
     )
 
     # An identity adopted on an earlier run survives a restart in entry.unique_id.
