@@ -26,6 +26,7 @@
     "error": {
       "cannot_connect": "Не удалось подключиться. Проверьте IP-адрес и доступность майнера.",
       "invalid_auth": "Неверные учётные данные. Проверьте API-ключ или пароль.",
+      "rate_limited": "Слишком много попыток входа. Подождите и повторите.",
       "unknown": "Неожиданная ошибка"
     },
     "abort": {
@@ -52,6 +53,7 @@
     "error": {
       "cannot_connect": "Не удалось подключиться. Проверьте IP-адрес и доступность майнера.",
       "invalid_auth": "Неверные учётные данные. Проверьте API-ключ или пароль.",
+      "rate_limited": "Слишком много попыток входа. Подождите и повторите.",
       "unknown": "Неожиданная ошибка"
     }
   },
@@ -73,10 +75,30 @@
       "active_pool": {"name": "Активный пул"},
       "pool_accepted": {"name": "Принятые шары пула"},
       "pool_rejected": {"name": "Отклонённые шары пула"},
-      "pool_ping": {"name": "Пинг пула"}
+      "pool_ping": {"name": "Пинг пула"},
+      "hashrate_stock": {"name": "Хэшрейт (заводской)"},
+      "hr_error": {"name": "Частота ошибок"},
+      "hw_error_count": {"name": "Аппаратные ошибки (шт)"},
+      "miner_state_time": {"name": "Время в состоянии"},
+      "pool_stale": {"name": "Устаревшие шары пула"},
+      "uptime": {"name": "Аптайм"},
+      "memory_free": {"name": "Свободная память"},
+      "fan_speed": {"name": "Вентилятор {id}"},
+      "chain_hashrate": {"name": "Плата {id} хэшрейт"},
+      "chain_pcb_temp": {"name": "Плата {id} температура"},
+      "chain_chip_temp": {"name": "Плата {id} температура чипов"},
+      "chain_hw_errors": {"name": "Плата {id} аппаратные ошибки"},
+      "chain_state": {"name": "Плата {id} состояние"},
+      "psu_pfc_temp": {"name": "Температура БП (PFC)"},
+      "psu_llc1_temp": {"name": "Температура БП (LLC1)"},
+      "psu_llc2_temp": {"name": "Температура БП (LLC2)"}
     },
     "binary_sensor": {
-      "is_mining": {"name": "Майнинг"}
+      "is_mining": {"name": "Майнинг"},
+      "fan_fault": {"name": "Вентилятор {id} отказ"}
+    },
+    "number": {
+      "throttle": {"name": "Троттлинг"}
     },
     "button": {
       "reboot": {"name": "Перезагрузка"},

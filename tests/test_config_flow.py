@@ -101,6 +101,25 @@ async def test_form_invalid_auth(hass):
     assert result2["errors"]["base"] == "invalid_auth"
 
 
+async def test_form_rate_limited(hass):
+    """POST /unlock 429 is shown as too many attempts, not a dead host."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.login",
+        new_callable=AsyncMock,
+        side_effect=VnishApiError("HTTP 429 for /unlock", status=429),
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: MOCK_HOST, CONF_PASSWORD: "pw"}
+        )
+
+    assert result2["type"] == FlowResultType.FORM
+    assert result2["errors"]["base"] == "rate_limited"
+
+
 async def test_form_duplicate(hass):
     """Config flow aborts when same host is already configured."""
     with patch(
@@ -246,7 +265,7 @@ async def _setup_entry(hass):
         source=config_entries.SOURCE_USER,
         options={},
         unique_id=MOCK_HOST,
-        discovery_keys={},
+        discovery_keys={}, subentries_data={},
     )
     with patch(
         "custom_components.vnish.api.VnishApiClient.get_info",

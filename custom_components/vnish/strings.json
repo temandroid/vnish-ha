@@ -26,6 +26,7 @@
     "error": {
       "cannot_connect": "Failed to connect. Check the IP address and make sure the miner is reachable.",
       "invalid_auth": "Invalid credentials. Check the API key or password.",
+      "rate_limited": "Too many sign-in attempts. Wait a moment and try again.",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
@@ -52,6 +53,7 @@
     "error": {
       "cannot_connect": "Failed to connect. Check the IP address and make sure the miner is reachable.",
       "invalid_auth": "Invalid credentials. Check the API key or password.",
+      "rate_limited": "Too many sign-in attempts. Wait a moment and try again.",
       "unknown": "Unexpected error occurred"
     }
   },
@@ -73,10 +75,30 @@
       "active_pool": {"name": "Active pool"},
       "pool_accepted": {"name": "Pool accepted shares"},
       "pool_rejected": {"name": "Pool rejected shares"},
-      "pool_ping": {"name": "Pool ping"}
+      "pool_ping": {"name": "Pool ping"},
+      "hashrate_stock": {"name": "Hashrate (stock)"},
+      "hr_error": {"name": "Error rate"},
+      "hw_error_count": {"name": "HW error count"},
+      "miner_state_time": {"name": "Time in state"},
+      "pool_stale": {"name": "Pool stale shares"},
+      "uptime": {"name": "Uptime"},
+      "memory_free": {"name": "Free memory"},
+      "fan_speed": {"name": "Fan {id} speed"},
+      "chain_hashrate": {"name": "Board {id} hashrate"},
+      "chain_pcb_temp": {"name": "Board {id} PCB temperature"},
+      "chain_chip_temp": {"name": "Board {id} chip temperature"},
+      "chain_hw_errors": {"name": "Board {id} HW errors"},
+      "chain_state": {"name": "Board {id} state"},
+      "psu_pfc_temp": {"name": "PSU temperature (PFC)"},
+      "psu_llc1_temp": {"name": "PSU temperature (LLC1)"},
+      "psu_llc2_temp": {"name": "PSU temperature (LLC2)"}
     },
     "binary_sensor": {
-      "is_mining": {"name": "Mining"}
+      "is_mining": {"name": "Mining"},
+      "fan_fault": {"name": "Fan {id} fault"}
+    },
+    "number": {
+      "throttle": {"name": "Throttle"}
     },
     "button": {
       "reboot": {"name": "Reboot"},

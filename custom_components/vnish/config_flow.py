@@ -51,6 +51,10 @@ def _errors_for(exc: Exception) -> str:
     if isinstance(exc, VnishAuthError):
         return "invalid_auth"
     if isinstance(exc, VnishApiError):
+        # POST /unlock answers 429 when the password was tried too often.
+        # That is neither a dead host nor a wrong password.
+        if exc.status == 429:
+            return "rate_limited"
         return "cannot_connect"
     return "unknown"
 

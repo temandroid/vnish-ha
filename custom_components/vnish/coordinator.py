@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from datetime import timedelta
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
@@ -13,6 +15,12 @@ from .api import VnishApiClient, VnishApiError, VnishAuthError
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# DataUpdateCoordinator gained an explicit config_entry argument after 2024.1.
+# Passing it avoids the ContextVar lookup that current HA warns about.
+_COORDINATOR_TAKES_CONFIG_ENTRY = (
+    "config_entry" in inspect.signature(DataUpdateCoordinator.__init__).parameters
+)
 
 
 def mac_from_info(info: dict | None) -> str | None:
@@ -32,13 +40,15 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
         client: VnishApiClient,
         scan_interval: int,
         fallback_name: str = "Vnish Miner",
+        config_entry: ConfigEntry | None = None,
     ) -> None:
-        super().__init__(
-            hass,
-            _LOGGER,
-            name="Vnish Miner",
-            update_interval=timedelta(seconds=scan_interval),
-        )
+        kwargs: dict = {
+            "name": "Vnish Miner",
+            "update_interval": timedelta(seconds=scan_interval),
+        }
+        if config_entry is not None and _COORDINATOR_TAKES_CONFIG_ENTRY:
+            kwargs["config_entry"] = config_entry
+        super().__init__(hass, _LOGGER, **kwargs)
         self.client = client
         self.info: dict = {}
         # Device name to use until /info answers. The config entry title is the
