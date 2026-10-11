@@ -91,6 +91,47 @@ def psu_temp_keys(data: dict | None) -> list[str]:
     ]
 
 
+WATER_TEMP_KEYS = ("inlet_water_temp", "outlet_water_temp")
+
+
+def _number(value: object) -> float | int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value
+
+
+def water_temp_keys(data: dict | None) -> list[str]:
+    """Water temperature fields that at least one board reports.
+
+    Only hydro-cooled models have them, so the sensors cannot be created up front.
+    """
+    chains = miner_of(data).get("chains")
+    if not isinstance(chains, list):
+        return []
+    return [
+        key
+        for key in WATER_TEMP_KEYS
+        if any(
+            isinstance(chain, dict) and _number(chain.get(key)) is not None
+            for chain in chains
+        )
+    ]
+
+
+def water_temp_max(data: dict | None, key: str) -> float | int | None:
+    """The hottest board reading: the safe side for overheat protection."""
+    chains = miner_of(data).get("chains")
+    if not isinstance(chains, list):
+        return None
+    values = [
+        value
+        for chain in chains
+        if isinstance(chain, dict)
+        and (value := _number(chain.get(key))) is not None
+    ]
+    return max(values) if values else None
+
+
 def active_user_pool(data: dict | None) -> dict:
     """The user pool the miner reports as active, or {} if none is.
 

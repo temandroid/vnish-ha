@@ -31,6 +31,8 @@ from .payload import (
     fan_ids,
     miner_of,
     psu_temp_keys,
+    water_temp_keys,
+    water_temp_max,
 )
 
 PARALLEL_UPDATES = 0
@@ -342,6 +344,28 @@ PSU_SENSORS: dict[str, VnishSensorDescription] = {
 }
 
 
+WATER_SENSORS: dict[str, VnishSensorDescription] = {
+    "inlet_water_temp": VnishSensorDescription(
+        key="water_inlet_temp",
+        translation_key="water_inlet_temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:water-thermometer-outline",
+        value_fn=lambda d: water_temp_max(d, "inlet_water_temp"),
+    ),
+    "outlet_water_temp": VnishSensorDescription(
+        key="water_outlet_temp",
+        translation_key="water_outlet_temp",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:water-thermometer",
+        value_fn=lambda d: water_temp_max(d, "outlet_water_temp"),
+    ),
+}
+
+
 def _watch(
     entry: ConfigEntry,
     coordinator: VnishCoordinator,
@@ -408,6 +432,13 @@ async def async_setup_entry(
         async_add_entities,
         psu_temp_keys,
         lambda key: [VnishSensor(coordinator, PSU_SENSORS[key])],
+    )
+    _watch(
+        entry,
+        coordinator,
+        async_add_entities,
+        water_temp_keys,
+        lambda key: [VnishSensor(coordinator, WATER_SENSORS[key])],
     )
 
 

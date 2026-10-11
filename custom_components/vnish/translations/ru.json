@@ -89,6 +89,8 @@
       "chain_chip_temp": {"name": "Плата {id} температура чипов"},
       "chain_hw_errors": {"name": "Плата {id} аппаратные ошибки"},
       "chain_state": {"name": "Плата {id} состояние"},
+      "water_inlet_temp": {"name": "Температура воды (вход)"},
+      "water_outlet_temp": {"name": "Температура воды (выход)"},
       "psu_pfc_temp": {"name": "Температура БП (PFC)"},
       "psu_llc1_temp": {"name": "Температура БП (LLC1)"},
       "psu_llc2_temp": {"name": "Температура БП (LLC2)"}

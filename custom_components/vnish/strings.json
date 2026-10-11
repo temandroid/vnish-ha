@@ -89,6 +89,8 @@
       "chain_chip_temp": {"name": "Board {id} chip temperature"},
       "chain_hw_errors": {"name": "Board {id} HW errors"},
       "chain_state": {"name": "Board {id} state"},
+      "water_inlet_temp": {"name": "Water temperature (inlet)"},
+      "water_outlet_temp": {"name": "Water temperature (outlet)"},
       "psu_pfc_temp": {"name": "PSU temperature (PFC)"},
       "psu_llc1_temp": {"name": "PSU temperature (LLC1)"},
       "psu_llc2_temp": {"name": "PSU temperature (LLC2)"}

@@ -352,3 +352,44 @@ async def test_fan_sensor_is_added_when_cooling_data_arrives(hass):
 
     fan = _state_by_unique_id(hass, "sensor", f"{MOCK_HOST}_fan_0_rpm")
     assert fan.state == "3000"
+
+
+async def test_water_temperatures_appear_on_hydro_models(hass):
+    """Hydro boards report water temps; the sensor shows the hottest board."""
+    chain = MOCK_SUMMARY["miner"]["chains"][0]
+    summary = {
+        "miner": {
+            **MOCK_SUMMARY["miner"],
+            "chains": [
+                {**chain, "id": 0, "inlet_water_temp": 34, "outlet_water_temp": 44},
+                {**chain, "id": 1, "inlet_water_temp": 35, "outlet_water_temp": 45},
+                {**chain, "id": 2, "inlet_water_temp": None, "outlet_water_temp": True},
+            ],
+        }
+    }
+    entry = config_entries.ConfigEntry(
+        version=1, minor_version=1, domain=DOMAIN, title="T", data={CONF_HOST: MOCK_HOST},
+        source=config_entries.SOURCE_USER, options={}, unique_id=MOCK_HOST, discovery_keys={}, subentries_data={},
+    )
+    with patch("custom_components.vnish.api.VnishApiClient.get_info", new_callable=AsyncMock, return_value=MOCK_INFO), \
+         patch("custom_components.vnish.api.VnishApiClient.get_summary", new_callable=AsyncMock, return_value=summary):
+        await hass.config_entries.async_add(entry)
+        await hass.async_block_till_done()
+
+    inlet = _state_by_unique_id(hass, "sensor", f"{MOCK_HOST}_water_inlet_temp")
+    assert inlet.state == "35"
+    outlet = _state_by_unique_id(hass, "sensor", f"{MOCK_HOST}_water_outlet_temp")
+    assert outlet.state == "45"
+
+    # Boards drop out while the miner restarts: the value goes unknown, the entity stays.
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator.async_set_updated_data({"miner": {**MOCK_SUMMARY["miner"], "chains": []}})
+    await hass.async_block_till_done()
+    assert _state_by_unique_id(hass, "sensor", f"{MOCK_HOST}_water_inlet_temp").state == STATE_UNKNOWN
+
+
+async def test_no_water_sensors_on_air_cooled_models(hass):
+    await _setup_integration(hass)
+    reg = er.async_get(hass)
+    assert reg.async_get_entity_id("sensor", DOMAIN, f"{MOCK_HOST}_water_inlet_temp") is None
+    assert reg.async_get_entity_id("sensor", DOMAIN, f"{MOCK_HOST}_water_outlet_temp") is None
