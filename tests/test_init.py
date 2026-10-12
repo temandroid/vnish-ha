@@ -10,7 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.vnish.api import VnishApiError, VnishAuthError
 from custom_components.vnish.const import CONF_PASSWORD, DOMAIN
 
-from .conftest import MOCK_HOST, MOCK_INFO, MOCK_SUMMARY
+from .conftest import MOCK_HOST, MOCK_INFO, MOCK_SUMMARY, get_device
 
 MOCK_MAC = "02:00:00:00:00:01"  # matches MOCK_INFO system.network_status.mac
 OTHER_HOST = "192.168.1.101"
@@ -41,7 +41,7 @@ async def test_unique_mac_is_adopted_as_identity(hass):
     entry = await _setup(hass, MOCK_HOST)
 
     assert entry.unique_id == MOCK_MAC
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MOCK_MAC)})
+    device = get_device(hass, MOCK_MAC)
     assert device is not None
     assert (CONNECTION_NETWORK_MAC, MOCK_MAC) in device.connections
 
@@ -61,8 +61,8 @@ async def test_cloned_mac_falls_back_to_host(hass):
     assert second.unique_id == OTHER_HOST
 
     reg = dr.async_get(hass)
-    mac_device = reg.async_get_device(identifiers={(DOMAIN, MOCK_MAC)})
-    host_device = reg.async_get_device(identifiers={(DOMAIN, OTHER_HOST)})
+    mac_device = get_device(hass, MOCK_MAC)
+    host_device = get_device(hass, OTHER_HOST)
     assert mac_device is not None
     assert host_device is not None
     assert mac_device.id != host_device.id  # two distinct devices, no merge
@@ -77,7 +77,7 @@ async def test_missing_mac_keeps_host_identity(hass):
     entry = await _setup(hass, MOCK_HOST, info=info)
 
     assert entry.unique_id == MOCK_HOST
-    assert dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MOCK_HOST)})
+    assert get_device(hass, MOCK_HOST)
 
 
 async def test_non_string_mac_does_not_abort_setup(hass):
@@ -127,7 +127,7 @@ async def test_orphan_host_device_is_merged_into_the_mac_device(hass):
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    assert dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MOCK_HOST)}) is None
+    assert get_device(hass, MOCK_HOST) is None
     # The entity followed the merge instead of pointing at a deleted device.
     assert er.async_get(hass).async_get(stranded.entity_id).device_id == mac_device.id
 
@@ -154,15 +154,13 @@ async def test_device_card_fills_in_after_a_late_info_backfill(hass):
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        placeholder = dr.async_get(hass).async_get_device(
-            identifiers={(DOMAIN, MOCK_HOST)}
-        )
+        placeholder = get_device(hass, MOCK_HOST)
         assert placeholder.model is None  # /info was unavailable at add time
 
         await hass.data[DOMAIN][entry.entry_id].async_refresh()
         await hass.async_block_till_done()
 
-    card = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MOCK_HOST)})
+    card = get_device(hass, MOCK_HOST)
     assert card.model == MOCK_INFO["model"]
     assert card.sw_version == MOCK_INFO["fw_version"]
 
@@ -194,8 +192,8 @@ async def test_legacy_host_device_is_rekeyed_to_mac(hass):
         await hass.async_block_till_done()
 
     reg = dr.async_get(hass)
-    assert reg.async_get_device(identifiers={(DOMAIN, MOCK_HOST)}) is None
-    migrated = reg.async_get_device(identifiers={(DOMAIN, MOCK_MAC)})
+    assert get_device(hass, MOCK_HOST) is None
+    migrated = get_device(hass, MOCK_MAC)
     assert migrated is not None
     assert migrated.id == legacy.id  # same device row -> history kept
     assert entry.unique_id == MOCK_MAC
@@ -238,7 +236,7 @@ async def test_entry_loads_while_the_miner_is_powered_off(hass):
     assert entry.state is ConfigEntryState.LOADED
     # The device keeps the name it was added with instead of being renamed to
     # the "Vnish Miner" placeholder just because /info was unreachable.
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, MOCK_HOST)})
+    device = get_device(hass, MOCK_HOST)
     assert device is not None
     assert device.name == "Antminer T21"
     # Entities exist, and honestly report that the miner is not answering.
@@ -326,8 +324,8 @@ async def test_offline_restart_does_not_create_a_duplicate_device(hass):
 
     reg = dr.async_get(hass)
     assert len(dr.async_entries_for_config_entry(reg, entry.entry_id)) == 1
-    assert reg.async_get_device(identifiers={(DOMAIN, MOCK_MAC)}) is not None
-    assert reg.async_get_device(identifiers={(DOMAIN, MOCK_HOST)}) is None
+    assert get_device(hass, MOCK_MAC) is not None
+    assert get_device(hass, MOCK_HOST) is None
 
 
 async def test_bad_credentials_still_trigger_reauth(hass):

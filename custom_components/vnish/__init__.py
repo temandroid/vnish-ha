@@ -8,7 +8,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import VnishApiClient
 from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
-from .coordinator import VnishCoordinator, mac_from_info
+from .coordinator import VnishCoordinator, find_device, mac_from_info
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -83,8 +83,8 @@ def _migrate_device_identity(
     of lingering as a phantom device.
     """
     dev_reg = dr.async_get(hass)
-    old_device = dev_reg.async_get_device(identifiers={(DOMAIN, host)})
-    new_device = dev_reg.async_get_device(identifiers={(DOMAIN, device_id)})
+    old_device = find_device(hass, entry.entry_id, host)
+    new_device = find_device(hass, entry.entry_id, device_id)
     if old_device and new_device and old_device.id != new_device.id:
         ent_reg = er.async_get(hass)
         for ent in er.async_entries_for_device(

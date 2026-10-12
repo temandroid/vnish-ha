@@ -23,6 +23,25 @@ _COORDINATOR_TAKES_CONFIG_ENTRY = (
 )
 
 
+def find_device(
+    hass: HomeAssistant, config_entry_id: str | None, identifier: str
+) -> dr.DeviceEntry | None:
+    """The miner device with this identifier, owned by this config entry.
+
+    HA 2026.x deprecated async_get_device (identifiers stopped being unique
+    across config entries; it stops working in 2027.8). Older HA has no
+    per-entry lookup, so it keeps the global one.
+    """
+    dev_reg = dr.async_get(hass)
+    if config_entry_id is not None and hasattr(
+        dev_reg, "async_get_device_by_identifier"
+    ):
+        return dev_reg.async_get_device_by_identifier(
+            (DOMAIN, identifier), config_entry_id
+        )
+    return dev_reg.async_get_device(identifiers={(DOMAIN, identifier)})
+
+
 def mac_from_info(info: dict | None) -> str | None:
     """Extract and normalise the MAC address from a /info payload.
 
@@ -50,6 +69,7 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
             kwargs["config_entry"] = config_entry
         super().__init__(hass, _LOGGER, **kwargs)
         self.client = client
+        self.entry_id = config_entry.entry_id if config_entry is not None else None
         self.info: dict = {}
         # Device name to use until /info answers. The config entry title is the
         # name the miner reported when it was added, so a miner that is offline
@@ -100,9 +120,7 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
         ("Vnish Miner", no model/firmware) for the rest of the session.
         Identity is deliberately NOT re-keyed here — only the metadata.
         """
-        device = dr.async_get(self.hass).async_get_device(
-            identifiers={(DOMAIN, self.device_id)}
-        )
+        device = find_device(self.hass, self.entry_id, self.device_id)
         if device is None:
             # Normal during the first refresh: entities do not exist yet, so
             # device_info will pick the info up at add time anyway.

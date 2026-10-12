@@ -184,3 +184,20 @@ def mock_api():
         return_value=MOCK_SUMMARY,
     ):
         yield
+
+
+def get_device(hass, identifier: str):
+    """The vnish device with this identifier, or None.
+
+    async_get_device is deprecated in HA 2026.x and raises in tests; the
+    by-identifier lookup needs an entry id the tests do not always have.
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    from custom_components.vnish.const import DOMAIN
+
+    reg = dr.async_get(hass)
+    if hasattr(reg, "async_get_devices"):
+        found = reg.async_get_devices(identifiers={(DOMAIN, identifier)})
+        return found[0] if found else None
+    return reg.async_get_device(identifiers={(DOMAIN, identifier)})

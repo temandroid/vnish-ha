@@ -24,6 +24,10 @@ async def test_form_success(hass):
         "custom_components.vnish.config_flow.VnishApiClient.get_info",
         new_callable=AsyncMock,
         return_value=MOCK_INFO,
+    ), patch(
+        "custom_components.vnish.async_setup_entry",
+        new_callable=AsyncMock,
+        return_value=True,
     ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_HOST: MOCK_HOST}
@@ -47,6 +51,10 @@ async def test_form_success_with_password(hass):
         "custom_components.vnish.config_flow.VnishApiClient.get_info",
         new_callable=AsyncMock,
         return_value=MOCK_INFO,
+    ), patch(
+        "custom_components.vnish.async_setup_entry",
+        new_callable=AsyncMock,
+        return_value=True,
     ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_HOST: MOCK_HOST, CONF_PASSWORD: "secret"}
@@ -126,6 +134,10 @@ async def test_form_duplicate(hass):
         "custom_components.vnish.config_flow.VnishApiClient.get_info",
         new_callable=AsyncMock,
         return_value=MOCK_INFO,
+    ), patch(
+        "custom_components.vnish.async_setup_entry",
+        new_callable=AsyncMock,
+        return_value=True,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
