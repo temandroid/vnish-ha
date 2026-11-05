@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -9,6 +10,12 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import VnishApiClient
 from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN, PLATFORMS
 from .coordinator import VnishCoordinator, find_device, mac_from_info
+
+# HA 2025.8+ reloads the entry itself after an options change
+# (OptionsFlowWithReload, see config_flow.py). An update listener on top of it
+# is reported since 2026.11 and stops working in 2026.12, so the listener is
+# only registered on older HA, where it is the only way to apply new options.
+_NEEDS_UPDATE_LISTENER = not hasattr(config_entries, "OptionsFlowWithReload")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -60,7 +67,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    if _NEEDS_UPDATE_LISTENER:
+        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
@@ -101,10 +109,17 @@ def _migrate_device_identity(
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    if await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
-        return True
-    return False
+    # HA 2026.11+ raises a translated ConfigEntryError when a platform fails to
+    # unload, instead of the bare False that users see as a generic failure.
+    unload_or_raise = getattr(
+        hass.config_entries, "async_unload_platforms_or_raise", None
+    )
+    if unload_or_raise is not None:
+        await unload_or_raise(entry, PLATFORMS)
+    elif not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
+    hass.data[DOMAIN].pop(entry.entry_id)
+    return True
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:

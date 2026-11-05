@@ -12,6 +12,14 @@ from .api import VnishApiClient, VnishApiError, VnishAuthError
 from .const import CONF_API_KEY, CONF_PASSWORD, DEFAULT_SCAN_INTERVAL, DOMAIN
 
 
+# HA 2025.8+: the options flow reloads the entry itself when options change,
+# which replaces the update listener (reported since 2026.11, broken in 2026.12).
+# Older HA falls back to the plain OptionsFlow plus the listener in __init__.py.
+_OptionsFlowBase = getattr(
+    config_entries, "OptionsFlowWithReload", config_entries.OptionsFlow
+)
+
+
 def _normalise_host(raw: str) -> str:
     """Reduce user input to a bare host[:port].
 
@@ -157,7 +165,7 @@ class VnishConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return VnishOptionsFlow(config_entry)
 
 
-class VnishOptionsFlow(config_entries.OptionsFlow):
+class VnishOptionsFlow(_OptionsFlowBase):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
 

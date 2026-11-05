@@ -291,3 +291,48 @@ async def _setup_entry(hass):
         await hass.config_entries.async_add(entry)
         await hass.async_block_till_done()
     return entry
+
+
+async def test_options_change_reloads_without_update_listener(hass, mock_api, caplog):
+    """New options are applied by a reload, with no update listener (HA 2026.12).
+
+    HA 2026.11 reports an update listener next to async_update_reload_and_abort
+    and 2026.12 stops honouring it; OptionsFlowWithReload replaces it.
+    """
+    entry = await _setup_entry(hass)
+    if not hasattr(config_entries, "OptionsFlowWithReload"):
+        pytest.skip("HA before 2025.8 still applies options via the listener")
+    assert entry.update_listeners == []
+    before = hass.data[DOMAIN][entry.entry_id]
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_SCAN_INTERVAL: 120}
+    )
+    await hass.async_block_till_done()
+
+    after = hass.data[DOMAIN][entry.entry_id]
+    assert after is not before
+    assert after.update_interval.total_seconds() == 120
+    assert "update listener" not in caplog.text
+
+
+async def test_reauth_does_not_report_update_listener(hass, mock_api, caplog):
+    """Reauth's reload-and-abort must not trip the 2026.12 update-listener check."""
+    entry = await _setup_entry(hass)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_REAUTH, "entry_id": entry.entry_id},
+        data=entry.data,
+    )
+    with patch(
+        "custom_components.vnish.config_flow.VnishApiClient.get_info",
+        new_callable=AsyncMock,
+        return_value=MOCK_INFO,
+    ):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "new-key"}
+        )
+    await hass.async_block_till_done()
+    assert result2["reason"] == "reauth_successful"
+    assert "update listener" not in caplog.text
