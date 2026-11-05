@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/temandroid/vnish-ha/releases"><img src="https://img.shields.io/github/v/release/temandroid/vnish-ha?style=flat-square" alt="Release"></a>
-  <img src="https://img.shields.io/badge/HA-2024.1%2B-blue?style=flat-square" alt="HA 2024.1+">
+  <img src="https://img.shields.io/badge/HA-2024.12%2B-blue?style=flat-square" alt="HA 2024.12+">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT">
 </p>
 
@@ -30,11 +30,23 @@
 ## Требования
 
 - ASIC-майнер с прошивкой Vnish (AnthillOS)
-- Home Assistant 2024.1+
+- Home Assistant 2024.12+ (своя иконка интеграции видна с 2026.3)
 
 ## Установка
 
-### HACS (рекомендуется)
+### Marketplace (HA 2026.11+, рекомендуется)
+
+С Home Assistant 2026.11 HACS встроен в ядро как **Marketplace**; установка из HACS
+переезжает туда сама при первом запуске после обновления.
+
+1. Настройки → Marketplace → ⋮ → Пользовательские репозитории
+2. Добавить `temandroid/vnish-ha`, категория `Integration`
+3. Установить и перезапустить HA
+
+Marketplace предлагает версии по **GitHub-релизам** (не по тегам) и не даст
+поставить релиз на HA старее 2024.12 — минимум указан в `hacs.json`.
+
+### HACS (HA до 2026.11)
 
 1. HACS → Настройки → Пользовательские репозитории
 2. Добавить `temandroid/vnish-ha`, категория `Integration`

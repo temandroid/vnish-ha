@@ -1,13 +1,21 @@
 {
   "domain": "vnish",
   "name": "Vnish Miner",
-  "codeowners": ["@temandroid"],
+  "categories": [
+    "finance",
+    "computers_network.monitoring"
+  ],
+  "codeowners": [
+    "@temandroid"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/temandroid/vnish-ha",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/temandroid/vnish-ha/issues",
-  "loggers": ["custom_components.vnish"],
+  "loggers": [
+    "custom_components.vnish"
+  ],
   "requirements": [],
   "version": "1.4.2"
 }
