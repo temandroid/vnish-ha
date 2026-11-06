@@ -231,6 +231,10 @@ class VnishApiClient:
     async def get_info(self) -> Any:
         return await self._request("GET", "/info")
 
+    async def get_status(self) -> Any:
+        """MinerStatus: state, throttle and the restart/reboot-required flags."""
+        return await self._request("GET", "/status")
+
     async def mining_start(self) -> bool:
         return await self._command("/mining/start")
 

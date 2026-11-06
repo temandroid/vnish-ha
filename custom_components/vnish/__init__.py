@@ -109,6 +109,9 @@ def _migrate_device_identity(
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # A throttle value still waiting out the pause belongs to this entry's
+    # client; it must not fire after the entry is gone or reloaded.
+    hass.data[DOMAIN][entry.entry_id].throttle_gate.cancel()
     # HA 2026.11+ raises a translated ConfigEntryError when a platform fails to
     # unload, instead of the bare False that users see as a generic failure.
     unload_or_raise = getattr(

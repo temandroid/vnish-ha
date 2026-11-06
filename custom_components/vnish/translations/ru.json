@@ -97,7 +97,9 @@
     },
     "binary_sensor": {
       "is_mining": {"name": "Майнинг"},
-      "fan_fault": {"name": "Вентилятор {id} отказ"}
+      "fan_fault": {"name": "Вентилятор {id} отказ"},
+      "restart_required": {"name": "Требуется перезапуск майнинга"},
+      "reboot_required": {"name": "Требуется перезагрузка"}
     },
     "number": {
       "throttle": {"name": "Троттлинг"}

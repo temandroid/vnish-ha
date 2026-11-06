@@ -12,7 +12,8 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import VnishApiClient, VnishApiError, VnishAuthError
-from .const import DOMAIN
+from .const import DOMAIN, THROTTLE_MIN_INTERVAL
+from .throttle import ThrottleGate
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,6 +80,21 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
         # otherwise the host IP). Kept constant for the session to avoid the
         # device being re-keyed mid-run.
         self.device_id: str = client.host
+        # GET /status (MinerStatus). /summary carries miner_state and throttled
+        # but not restart_required / reboot_required, so it is polled too: a
+        # ~150-byte answer next to a multi-kilobyte /summary. {} while unknown.
+        self.status: dict = {}
+        # Cleared for good on a 404/405 (firmware without the endpoint), so an
+        # old miner is not asked a question it cannot answer every cycle.
+        self._status_supported = True
+        # All throttle writes, from any entity or automation, go through here.
+        self.throttle_gate = ThrottleGate(
+            hass,
+            # Late-bound, so the client method is looked up per command.
+            lambda percent: self.client.mining_throttle(percent),
+            THROTTLE_MIN_INTERVAL,
+            on_sent=self.async_request_refresh,
+        )
 
     async def _async_update_data(self) -> dict:
         try:
@@ -109,7 +125,30 @@ class VnishCoordinator(DataUpdateCoordinator[dict]):
             else:
                 if self.info:
                     self._async_refresh_device_card()
+
+        if self._status_supported:
+            await self._async_update_status()
         return data
+
+    async def _async_update_status(self) -> None:
+        """Refresh self.status. Never fails the whole update over /status."""
+        try:
+            status = await self.client.get_status()
+        except VnishAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except VnishApiError as err:
+            self.status = {}
+            if err.status in (404, 405):
+                self._status_supported = False
+                _LOGGER.info(
+                    "Firmware has no /status (HTTP %s); restart/reboot-required "
+                    "sensors will not be created",
+                    err.status,
+                )
+            else:
+                _LOGGER.debug("Could not fetch /status (will retry): %s", err)
+            return
+        self.status = status if isinstance(status, dict) else {}
 
     @callback
     def _async_refresh_device_card(self) -> None:

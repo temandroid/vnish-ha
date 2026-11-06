@@ -76,9 +76,14 @@ class VnishThrottleNumber(VnishEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         percent = int(value)
-        accepted = await self.coordinator.client.mining_throttle(percent)
-        if accepted:
+        # Through the gate, never straight to the client: two throttle commands
+        # closer than ~10 s break the miner's preset setup (see throttle.py).
+        # None means "queued behind the pause": shown optimistically like an
+        # accepted command, and the gate refreshes once it has been sent.
+        result = await self.coordinator.throttle_gate.async_request(percent)
+        if result is not False:
             self._optimistic = percent
             self._optimistic_cycles = 0
             self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
+        if result is not None:
+            await self.coordinator.async_request_refresh()

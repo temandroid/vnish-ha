@@ -32,6 +32,33 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     yield
 
 
+MOCK_STATUS = {
+    "miner_state": "mining",
+    "throttled": 100,
+    "miner_state_time": 3600,
+    "find_miner": False,
+    "restart_required": False,
+    "reboot_required": False,
+    "unlocked": False,
+}
+
+
+@pytest.fixture(autouse=True)
+def mock_status():
+    """GET /status for every test; tests change return_value / side_effect.
+
+    Autouse because the coordinator polls /status on every update, and most
+    tests only patch get_info/get_summary — without this they would try a real
+    HTTP request to the mock host.
+    """
+    with patch(
+        "custom_components.vnish.api.VnishApiClient.get_status",
+        new_callable=AsyncMock,
+        return_value=dict(MOCK_STATUS),
+    ) as mock:
+        yield mock
+
+
 MOCK_HOST = "192.168.1.100"
 MOCK_API_KEY = "test-api-key"
 

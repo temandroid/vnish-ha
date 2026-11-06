@@ -28,6 +28,13 @@ ACTIVE_MINING_STATES = frozenset(
 THROTTLE_MIN = 20
 THROTTLE_MAX = 100
 
+# Minimum pause, in seconds, between two POST /mining/throttle commands. Each
+# one makes Vnish re-apply the performance preset, which takes ~10 s (up to 12 s
+# in the 1.3.5 logs); a command that lands inside that window is lost and the
+# miner raises restart_required. 15 s leaves a margin over the slowest cycle
+# seen. Writes inside the pause are coalesced, see throttle.py.
+THROTTLE_MIN_INTERVAL = 15
+
 # PoolStats.pool_type values that belong to the firmware, not the user.
 # A missing pool_type is treated as a user pool: older firmware omitted it.
 NON_USER_POOL_TYPES = frozenset({"DevFee", "Refund"})
